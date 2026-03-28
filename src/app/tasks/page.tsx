@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-import { TasksPage } from "../../features/TasksPage";
-
-export default function Page() {
-  return <TasksPage />;
-=======
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 
@@ -27,5 +21,4 @@ export default async function Page() {
       }}
     />
   );
->>>>>>> origin/lauren/tasks
 }

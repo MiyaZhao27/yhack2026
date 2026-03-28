@@ -1,10 +1,3 @@
-<<<<<<< HEAD
-import { NextRequest, NextResponse } from "next/server";
-
-import { connectDatabase } from "../../../server/config/db";
-import { Suite } from "../../../server/models/Suite";
-import { User } from "../../../server/models/User";
-=======
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -40,41 +33,10 @@ async function getOrCreateCurrentUser(session: any) {
 
   return currentUser;
 }
->>>>>>> origin/lauren/tasks
 
 export async function GET() {
   await connectDatabase();
   const suites = (await Suite.find().lean()) as any[];
-<<<<<<< HEAD
-  return NextResponse.json(suites);
-}
-
-export async function POST(request: NextRequest) {
-  await connectDatabase();
-
-  const { name, members } = (await request.json()) as { name: string; members: string[] };
-
-  const suite = await Suite.create({ name, memberIds: [] });
-  const createdMembers = await User.insertMany(
-    members
-      .filter(Boolean)
-      .map((memberName) => ({
-        name: memberName.trim(),
-        suiteId: suite._id,
-      }))
-  );
-
-  suite.memberIds = createdMembers.map((member) => String(member._id));
-  await suite.save();
-
-  return NextResponse.json(
-    {
-      ...suite.toObject(),
-      members: createdMembers,
-    },
-    { status: 201 }
-  );
-=======
   return NextResponse.json(
     suites.map((suite) => ({
       ...suite,
@@ -124,5 +86,4 @@ export async function POST(request: NextRequest) {
     console.error("create suite failed", error);
     return NextResponse.json({ message: "Failed to create suite" }, { status: 500 });
   }
->>>>>>> origin/lauren/tasks
 }

@@ -5,7 +5,6 @@ export interface ExpenseDocument {
   title: string;
   amount: number;
   paidBy: Types.ObjectId | string;
-<<<<<<< HEAD
   date: Date;
   participants: Array<Types.ObjectId | string>;
   splitMethod: "equal" | "exact" | "percentage" | "itemized";
@@ -41,20 +40,12 @@ const expenseItemSchema = new Schema(
   { _id: false }
 );
 
-=======
-  participants: Array<Types.ObjectId | string>;
-  splitType: "equal";
-  createdAt: Date;
-}
-
->>>>>>> origin/lauren/tasks
 const expenseSchema = new Schema<ExpenseDocument>(
   {
     suiteId: { type: Schema.Types.ObjectId, ref: "Suite", required: true },
     title: { type: String, required: true, trim: true },
     amount: { type: Number, required: true, min: 0 },
     paidBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
-<<<<<<< HEAD
     date: { type: Date, default: Date.now },
     participants: [{ type: Schema.Types.ObjectId, ref: "User" }],
     splitMethod: {
@@ -64,11 +55,6 @@ const expenseSchema = new Schema<ExpenseDocument>(
     },
     splits: [expenseSplitSchema],
     items: [expenseItemSchema],
-=======
-    participants: [{ type: Schema.Types.ObjectId, ref: "User", required: true }],
-    splitType: { type: String, enum: ["equal"], default: "equal" },
-    createdAt: { type: Date, default: Date.now },
->>>>>>> origin/lauren/tasks
   },
   { timestamps: true, versionKey: false }
 );

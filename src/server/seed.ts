@@ -7,11 +7,8 @@ import { Suite } from "./models/Suite";
 import { Task } from "./models/Task";
 import { User } from "./models/User";
 
-<<<<<<< HEAD
-=======
 const SEEDED_INVITE_CODE = "MAPLE4";
 
->>>>>>> origin/lauren/tasks
 async function seed() {
   await connectDatabase();
 
@@ -23,11 +20,7 @@ async function seed() {
     Suite.deleteMany({}),
   ]);
 
-<<<<<<< HEAD
-  const suite = await Suite.create({ name: "Maple 4B", memberIds: [] });
-=======
   const suite = await Suite.create({ name: "Maple 4B", memberIds: [], inviteCode: SEEDED_INVITE_CODE });
->>>>>>> origin/lauren/tasks
   const [edmund, alex, ryan, mia] = await User.insertMany([
     { name: "Edmund", suiteId: suite._id },
     { name: "Alex", suiteId: suite._id },
@@ -142,11 +135,7 @@ async function seed() {
     },
   ]);
 
-<<<<<<< HEAD
-  console.log("Seeded Maple 4B with demo data");
-=======
   console.log(`Seeded Maple 4B with demo data (invite code: ${suite.inviteCode})`);
->>>>>>> origin/lauren/tasks
   await mongoose.disconnect();
 }
 
