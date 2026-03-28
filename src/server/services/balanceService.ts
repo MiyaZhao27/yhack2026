@@ -16,40 +16,6 @@ interface BalanceMember {
   outstandingNet: number; // outstandingReceivable - outstanding
 }
 
-// Greedy minimum-transactions settle-up algorithm
-function buildSettleUps(
-  netMap: Map<string, { name: string; net: number }>
-): { from: string; fromId: string; to: string; toId: string; amount: number }[] {
-  const creditors = [...netMap.entries()]
-    .filter(([, m]) => m.net > 0.01)
-    .map(([id, m]) => ({ id, name: m.name, net: m.net }));
-  const debtors = [...netMap.entries()]
-    .filter(([, m]) => m.net < -0.01)
-    .map(([id, m]) => ({ id, name: m.name, net: Math.abs(m.net) }));
-
-  const result: { from: string; fromId: string; to: string; toId: string; amount: number }[] = [];
-  let ci = 0;
-  let di = 0;
-
-  while (ci < creditors.length && di < debtors.length) {
-    const c = creditors[ci];
-    const d = debtors[di];
-    const amount = Math.min(c.net, d.net);
-    result.push({
-      from: d.name,
-      fromId: d.id,
-      to: c.name,
-      toId: c.id,
-      amount: Number(amount.toFixed(2)),
-    });
-    c.net -= amount;
-    d.net -= amount;
-    if (c.net <= 0.01) ci++;
-    if (d.net <= 0.01) di++;
-  }
-
-  return result;
-}
 
 export async function getSuiteBalances(suiteId: string) {
   const [members, expenses, settlements] = (await Promise.all([
@@ -178,9 +144,24 @@ export async function getSuiteBalances(suiteId: string) {
     outstandingNet: Number(m.outstandingNet.toFixed(2)),
   }));
 
-  const settleUps = buildSettleUps(
-    new Map(balanceRows.map((b) => [b.userId, { name: b.name, net: b.outstandingNet }]))
-  );
+  // Build settle-ups from actual pairwise remaining obligations (not net netting)
+  // This ensures each suggestion corresponds to a real debt between two specific people.
+  const settleUps: { from: string; fromId: string; to: string; toId: string; amount: number }[] = [];
+  for (const [debtorId, credMap] of remaining) {
+    const debtor = balances.get(debtorId);
+    if (!debtor) continue;
+    for (const [creditorId, amount] of credMap) {
+      const creditor = balances.get(creditorId);
+      if (!creditor) continue;
+      settleUps.push({
+        from: debtor.name,
+        fromId: debtorId,
+        to: creditor.name,
+        toId: creditorId,
+        amount: Number(amount.toFixed(2)),
+      });
+    }
+  }
 
   return { balances: balanceRows, settleUps };
 }
