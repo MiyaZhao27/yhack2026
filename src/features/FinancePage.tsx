@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { api } from "../lib/api/client";
 import { EmptyState } from "../components/EmptyState";
@@ -9,6 +9,7 @@ import { SectionCard } from "../components/SectionCard";
 import { useSuite } from "../context/SuiteContext";
 import { formatCurrency, formatDate } from "../lib/ui/format";
 import { AddExpenseModal } from "./finance/AddExpenseModal";
+import { EditExpenseModal } from "./finance/EditExpenseModal";
 import { RecordPaymentModal } from "./finance/RecordPaymentModal";
 import { Balance, Expense, Settlement } from "../types";
 
@@ -28,6 +29,9 @@ export function FinancePage() {
   const [settleUpView, setSettleUpView] = useState<"net" | "per-expense">("net");
   const [expandedExpenses, setExpandedExpenses] = useState<Set<string>>(new Set());
   const [expandedSettlements, setExpandedSettlements] = useState<Set<string>>(new Set());
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [filterPeriod, setFilterPeriod] = useState<"all" | "week" | "month">("all");
+  const [filterUser, setFilterUser] = useState("");
 
   const loadAll = async () => {
     if (!suite?._id) return;
@@ -78,6 +82,32 @@ export function FinancePage() {
       return next;
     });
 
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter((e) => {
+      // Period filter
+      if (filterPeriod !== "all") {
+        const expDate = new Date(e.date ?? e.createdAt);
+        const now = new Date();
+        if (filterPeriod === "week") {
+          const weekAgo = new Date(now);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          if (expDate < weekAgo) return false;
+        } else if (filterPeriod === "month") {
+          const monthAgo = new Date(now);
+          monthAgo.setMonth(monthAgo.getMonth() - 1);
+          if (expDate < monthAgo) return false;
+        }
+      }
+      // User filter (paidBy OR participant)
+      if (filterUser) {
+        const inParticipants = e.participants.includes(filterUser);
+        const isPayer = e.paidBy === filterUser;
+        if (!inParticipants && !isPayer) return false;
+      }
+      return true;
+    });
+  }, [expenses, filterPeriod, filterUser]);
+
   const handleDeleteExpense = async (id: string) => {
     const data = await api.delete<{ balances: Balance[]; settleUps: SettleUp[] }>(`/expenses/${id}`);
     setExpenses((prev) => prev.filter((e) => e._id !== id));
@@ -99,6 +129,21 @@ export function FinancePage() {
 
   return (
     <>
+      {editingExpense && (
+        <EditExpenseModal
+          expense={editingExpense}
+          members={members}
+          onSuccess={(updatedExpense, newBalances, newSettleUps) => {
+            setExpenses((prev) =>
+              prev.map((e) => (e._id === updatedExpense._id ? updatedExpense : e))
+            );
+            setBalances(newBalances);
+            setSettleUps(newSettleUps as SettleUp[]);
+            setEditingExpense(null);
+          }}
+          onClose={() => setEditingExpense(null)}
+        />
+      )}
       {showAddExpense && suite && (
         <AddExpenseModal
           members={members}
@@ -203,7 +248,7 @@ export function FinancePage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {expenses.map((expense) => {
+                  {filteredExpenses.map((expense) => {
                     const nonPayerSplits = expense.splits.filter(
                       (sp) => sp.participantId !== expense.paidBy
                     );
@@ -259,7 +304,7 @@ export function FinancePage() {
                       </div>
                     );
                   })}
-                  {expenses.every((expense) =>
+                  {filteredExpenses.every((expense) =>
                     expense.splits
                       .filter((sp) => sp.participantId !== expense.paidBy)
                       .every((sp) => {
@@ -286,8 +331,47 @@ export function FinancePage() {
               </button>
             }
           >
+            {/* Filter bar */}
+            <div className="mb-4 flex flex-wrap gap-2">
+              <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+                {(["all", "week", "month"] as const).map((p) => (
+                  <button
+                    key={p}
+                    className={`rounded-lg px-3 py-1 text-xs font-medium transition ${
+                      filterPeriod === p ? "bg-white shadow-sm text-slate-900" : "text-slate-500"
+                    }`}
+                    onClick={() => setFilterPeriod(p)}
+                  >
+                    {p === "all" ? "All time" : p === "week" ? "This week" : "This month"}
+                  </button>
+                ))}
+              </div>
+              <select
+                className="rounded-xl border-0 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
+                value={filterUser}
+                onChange={(e) => setFilterUser(e.target.value)}
+              >
+                <option value="">All members</option>
+                {members.map((m) => (
+                  <option key={m._id} value={m._id}>{m.name}</option>
+                ))}
+              </select>
+              {(filterPeriod !== "all" || filterUser) && (
+                <button
+                  className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800"
+                  onClick={() => { setFilterPeriod("all"); setFilterUser(""); }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            {(filterPeriod !== "all" || filterUser) && (
+              <p className="mb-3 text-xs text-slate-500">
+                Showing {filteredExpenses.length} of {expenses.length} expenses
+              </p>
+            )}
             <div className="space-y-3">
-              {expenses.map((expense) => {
+              {filteredExpenses.map((expense) => {
                 const isExpanded = expandedExpenses.has(expense._id);
                 return (
                   <div key={expense._id} className="rounded-2xl bg-slate-50">
@@ -307,6 +391,15 @@ export function FinancePage() {
                       <p className="font-semibold text-slate-900">
                         {formatCurrency(expense.amount)}
                       </p>
+                      <button
+                        className="text-slate-400 hover:text-sky-500"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingExpense(expense);
+                        }}
+                      >
+                        <Pencil size={15} />
+                      </button>
                       <button
                         className="text-slate-400 hover:text-rose-500"
                         onClick={(e) => {
@@ -381,7 +474,9 @@ export function FinancePage() {
                   </div>
                 );
               })}
-              {!expenses.length && <EmptyState label="No expenses yet." />}
+              {!filteredExpenses.length && (
+                <EmptyState label={expenses.length ? "No expenses match the current filters." : "No expenses yet."} />
+              )}
             </div>
           </SectionCard>
         </div>

@@ -3,7 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDatabase } from "../../../../server/config/db";
 import { Expense } from "../../../../server/models/Expense";
 import { getSuiteBalances } from "../../../../server/services/balanceService";
-import { computeEqualSplits } from "../../../../lib/finance/calculations";
+import {
+  computeEqualSplits,
+  computeExactSplits,
+  computeItemizedSplits,
+  computePercentageSplits,
+  validateExactSplits,
+  validatePercentageSplits,
+} from "../../../../lib/finance/calculations";
 
 export async function PATCH(
   request: NextRequest,
@@ -16,28 +23,41 @@ export async function PATCH(
   const current = (await Expense.findById(id).lean()) as any;
   if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const newAmount = body.amount !== undefined ? body.amount : current.amount;
-  const splitMethod: string = current.splitMethod || "equal";
-  const participants: string[] = current.participants.map(String);
+  const amount = body.amount ?? current.amount;
+  const participants = body.participants ?? current.participants.map(String);
+  const splitMethod = body.splitMethod ?? current.splitMethod ?? "equal";
+  const splits = body.splits;
+  const items = body.items ?? current.items;
 
-  // Recompute splits when amount changes for equal/itemized
-  let updatedSplits = current.splits;
-  if (body.amount !== undefined && body.amount !== current.amount) {
-    if (splitMethod === "equal") {
-      updatedSplits = computeEqualSplits(newAmount, participants);
-    } else if (splitMethod === "itemized" && current.items?.length) {
-      const scaleFactor = newAmount / current.amount;
-      updatedSplits = current.splits.map((s: any) => ({
-        ...s,
-        owedAmount: Number((s.owedAmount * scaleFactor).toFixed(2)),
-      }));
-    }
-    // For exact/percentage, keep splits unchanged — user should delete + re-add
+  let computedSplits;
+  if (splitMethod === "equal") {
+    computedSplits = computeEqualSplits(amount, participants);
+  } else if (splitMethod === "exact" && splits) {
+    const validation = validateExactSplits(splits, amount);
+    if (!validation.valid) return NextResponse.json({ error: validation.error }, { status: 400 });
+    computedSplits = computeExactSplits(splits);
+  } else if (splitMethod === "percentage" && splits) {
+    const validation = validatePercentageSplits(splits);
+    if (!validation.valid) return NextResponse.json({ error: validation.error }, { status: 400 });
+    computedSplits = computePercentageSplits(amount, splits);
+  } else if (splitMethod === "itemized") {
+    computedSplits = computeItemizedSplits(items);
+  } else {
+    computedSplits = current.splits;
   }
 
   const expense = await Expense.findByIdAndUpdate(
     id,
-    { ...body, splits: updatedSplits },
+    {
+      title: body.title ?? current.title,
+      amount,
+      paidBy: body.paidBy ?? current.paidBy,
+      participants,
+      splitMethod,
+      splits: computedSplits,
+      items,
+      date: body.date ? new Date(body.date) : current.date,
+    },
     { new: true }
   ).lean();
 

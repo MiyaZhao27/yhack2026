@@ -24,20 +24,36 @@ export interface ManualExpenseData {
 
 interface Props {
   members: Member[];
+  initialData?: ManualExpenseData;
   onSubmit: (data: ManualExpenseData) => Promise<void>;
   submitting: boolean;
 }
 
-export function ManualExpenseForm({ members, onSubmit, submitting }: Props) {
+export function ManualExpenseForm({ members, initialData, onSubmit, submitting }: Props) {
   const today = new Date().toISOString().split("T")[0];
 
-  const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
-  const [paidBy, setPaidBy] = useState(members[0]?._id || "");
-  const [date, setDate] = useState(today);
-  const [participants, setParticipants] = useState<string[]>(members.map((m) => m._id));
-  const [splitMethod, setSplitMethod] = useState<SplitMethod>("equal");
-  const [splitEntries, setSplitEntries] = useState<{ participantId: string; value: string }[]>([]);
+  const [title, setTitle] = useState(initialData?.title ?? "");
+  const [amount, setAmount] = useState(initialData?.amount != null ? String(initialData.amount) : "");
+  const [paidBy, setPaidBy] = useState(initialData?.paidBy ?? members[0]?._id ?? "");
+  const [date, setDate] = useState(initialData?.date ?? today);
+  const [participants, setParticipants] = useState<string[]>(initialData?.participants ?? members.map((m) => m._id));
+  const [splitMethod, setSplitMethod] = useState<SplitMethod>(initialData?.splitMethod ?? "equal");
+  const [splitEntries, setSplitEntries] = useState<{ participantId: string; value: string }[]>(() => {
+    if (!initialData?.splits?.length) return [];
+    if (initialData.splitMethod === "exact") {
+      return initialData.splits.map((s) => ({
+        participantId: s.participantId,
+        value: String(s.owedAmount),
+      }));
+    }
+    if (initialData.splitMethod === "percentage") {
+      return initialData.splits.map((s) => ({
+        participantId: s.participantId,
+        value: String(s.percentage ?? 0),
+      }));
+    }
+    return [];
+  });
   const [error, setError] = useState("");
 
   const totalAmount = parseFloat(amount) || 0;
@@ -294,7 +310,7 @@ export function ManualExpenseForm({ members, onSubmit, submitting }: Props) {
       {error && <p className="text-sm text-rose-600">{error}</p>}
 
       <button className="button-primary w-full" type="submit" disabled={submitting}>
-        {submitting ? "Saving..." : "Save Expense"}
+        {submitting ? "Saving..." : initialData ? "Save Changes" : "Save Expense"}
       </button>
     </form>
   );
