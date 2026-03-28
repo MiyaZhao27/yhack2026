@@ -29,22 +29,29 @@ export function SuiteProvider({ children }: { children: ReactNode }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const clearSuiteState = () => {
+    setSuite(null);
+    setMembers([]);
+  };
+
   const refreshSuite = async (suiteId?: string) => {
     setLoading(true);
     try {
-      const suites = await api.get<Suite[]>("/suites");
-      const selectedId = suiteId || localStorage.getItem(STORAGE_KEY) || suites[0]?._id;
+      const selectedId = suiteId || localStorage.getItem(STORAGE_KEY);
 
       if (!selectedId) {
-        setSuite(null);
-        setMembers([]);
+        clearSuiteState();
         return;
       }
 
-      const suiteData = await api.get<Suite>(`/suites/${selectedId}`);
-      localStorage.setItem(STORAGE_KEY, suiteData._id);
-      setSuite(suiteData);
-      setMembers(suiteData.members || []);
+      try {
+        const suiteData = await api.get<Suite>(`/suites/${selectedId}`);
+        localStorage.setItem(STORAGE_KEY, suiteData._id);
+        setSuite(suiteData);
+        setMembers(suiteData.members || []);
+      } catch {
+        clearSuiteState();
+      }
     } finally {
       setLoading(false);
     }
