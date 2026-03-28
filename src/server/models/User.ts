@@ -2,20 +2,19 @@ import { Schema, Types, model, models } from "mongoose";
 
 export interface UserDocument {
   name: string;
-  email: string;
+  email?: string;
   image?: string | null;
-  googleId: string;
+  googleId?: string;
   suiteId?: Types.ObjectId | string | null;
   onboardingComplete: boolean;
 }
 
-
 const userSchema = new Schema<UserDocument>(
   {
     name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, trim: true, lowercase: true },
+    email: { type: String, unique: true, sparse: true, trim: true, lowercase: true },
     image: { type: String, default: null },
-    googleId: { type: String, required: true, unique: true },
+    googleId: { type: String, unique: true, sparse: true },
     suiteId: { type: Schema.Types.ObjectId, ref: "Suite", default: null },
     onboardingComplete: { type: Boolean, default: false },
   },

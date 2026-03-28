@@ -1,14 +1,15 @@
 import "next-auth";
+import "next-auth/jwt";
 
 declare module "next-auth" {
   interface Session {
     user: {
-      id: string;
+      id?: string;
+      suiteId?: string | null;
+      onboardingComplete?: boolean;
       name?: string | null;
       email?: string | null;
       image?: string | null;
-      suiteId?: string | null;
-      onboardingComplete?: boolean;
     };
   }
 }

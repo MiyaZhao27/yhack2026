@@ -2,12 +2,14 @@ export interface Member {
   _id: string;
   name: string;
   suiteId: string;
+  email?: string;
 }
 
 export interface Suite {
   _id: string;
   name: string;
   memberIds: string[];
+  inviteCode?: string;
   members?: Member[];
 }
 

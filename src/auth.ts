@@ -5,6 +5,7 @@ import { connectDatabase } from "./server/config/db";
 import { User } from "./server/models/User";
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.AUTH_SECRET,
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID || "",
