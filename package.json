@@ -2,6 +2,7 @@
   "name": "livewell",
   "private": true,
   "version": "1.0.0",
+<<<<<<< HEAD
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -25,5 +26,18 @@
     "tailwindcss": "^3.4.16",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
+=======
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install --workspaces",
+    "dev": "npm run dev --workspace backend & npm run dev --workspace frontend",
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend",
+    "seed": "npm run seed --workspace backend"
+>>>>>>> 8edb517e (init commit)
   }
 }
