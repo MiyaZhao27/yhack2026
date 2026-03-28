@@ -1,4 +1,10 @@
-node_modules/
+# Next.js
 .next/
+frontend/.next/
+
+# dependencies
+node_modules/
+frontend/node_modules/
+
+# env
 .env
-dist/
