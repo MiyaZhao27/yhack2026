@@ -2,7 +2,7 @@
 
 ## TO RUN LOCAL:
 cp .env.example .env
-npm install
-npm run seed --workspace backend
-npm run dev --workspace backend
-npm run dev --workspace frontend
+- npm install
+- npm run seed --workspace backend
+- npm run dev --workspace backend
+- npm run dev --workspace frontend
