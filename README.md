@@ -1,4 +1,4 @@
-# yhack2026
+git add README.md# yhack2026
 
 ### TO RUN LOCAL:
 ```
