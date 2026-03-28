@@ -9,7 +9,20 @@ import { useSuite } from "../context/SuiteContext";
 import { formatDate } from "../lib/ui/format";
 import { Task } from "../types";
 
+<<<<<<< HEAD
 export function TasksPage() {
+=======
+interface TasksPageProps {
+  currentUser?: {
+    id?: string;
+    name?: string | null;
+    email?: string | null;
+    suiteId?: string | null;
+  };
+}
+
+export function TasksPage({ currentUser }: TasksPageProps) {
+>>>>>>> origin/lauren/tasks
   const { suite, members } = useSuite();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [form, setForm] = useState({
@@ -54,6 +67,16 @@ export function TasksPage() {
   return (
     <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
       <SectionCard title="New Task" subtitle="Assign a chore with just enough structure">
+<<<<<<< HEAD
+=======
+        {currentUser ? (
+          <div className="mb-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+            <p className="font-semibold text-slate-900">{currentUser.name || "Signed-in user"}</p>
+            <p>{currentUser.email}</p>
+            {currentUser.id ? <p className="mt-1 text-xs text-slate-500">User ID: {currentUser.id}</p> : null}
+          </div>
+        ) : null}
+>>>>>>> origin/lauren/tasks
         <form className="space-y-4" onSubmit={handleSubmit}>
           <input
             className="input"

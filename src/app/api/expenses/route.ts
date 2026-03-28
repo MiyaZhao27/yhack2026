@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDatabase } from "../../../server/config/db";
 import { Expense } from "../../../server/models/Expense";
 import { getSuiteBalances } from "../../../server/services/balanceService";
+<<<<<<< HEAD
 import {
   computeEqualSplits,
   computeExactSplits,
@@ -11,6 +12,8 @@ import {
   validateExactSplits,
   validatePercentageSplits,
 } from "../../../lib/finance/calculations";
+=======
+>>>>>>> origin/lauren/tasks
 
 export async function GET(request: NextRequest) {
   await connectDatabase();
@@ -26,6 +29,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   await connectDatabase();
 
+<<<<<<< HEAD
   const body = await request.json();
   const { suiteId, title, amount, paidBy, participants, splitMethod, splits, items, date } = body;
 
@@ -63,5 +67,13 @@ export async function POST(request: NextRequest) {
   });
 
   const balanceData = await getSuiteBalances(String(expense.suiteId));
+=======
+  const expense = await Expense.create({
+    ...(await request.json()),
+    splitType: "equal",
+  });
+  const balanceData = await getSuiteBalances(String(expense.suiteId));
+
+>>>>>>> origin/lauren/tasks
   return NextResponse.json({ expense, ...balanceData }, { status: 201 });
 }

@@ -15,5 +15,19 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   }
 
   const members = (await User.find({ suiteId: suite._id }).lean()) as any[];
+<<<<<<< HEAD
   return NextResponse.json({ ...suite, members });
+=======
+  return NextResponse.json({
+    ...suite,
+    _id: String(suite._id),
+    memberIds: (suite.memberIds || []).map((memberId: any) => String(memberId)),
+    inviteCode: suite.inviteCode,
+    members: members.map((member) => ({
+      ...member,
+      _id: String(member._id),
+      suiteId: member.suiteId ? String(member.suiteId) : member.suiteId,
+    })),
+  });
+>>>>>>> origin/lauren/tasks
 }

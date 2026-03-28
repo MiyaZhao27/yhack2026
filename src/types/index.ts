@@ -2,12 +2,20 @@ export interface Member {
   _id: string;
   name: string;
   suiteId: string;
+<<<<<<< HEAD
+=======
+  email?: string;
+>>>>>>> origin/lauren/tasks
 }
 
 export interface Suite {
   _id: string;
   name: string;
   memberIds: string[];
+<<<<<<< HEAD
+=======
+  inviteCode?: string;
+>>>>>>> origin/lauren/tasks
   members?: Member[];
 }
 
@@ -33,6 +41,7 @@ export interface ShoppingItem {
   boughtBy?: string | null;
 }
 
+<<<<<<< HEAD
 export type SplitMethod = "equal" | "exact" | "percentage" | "itemized";
 
 export interface ExpenseSplit {
@@ -47,12 +56,15 @@ export interface ExpenseItem {
   assignedParticipants: string[];
 }
 
+=======
+>>>>>>> origin/lauren/tasks
 export interface Expense {
   _id: string;
   suiteId: string;
   title: string;
   amount: number;
   paidBy: string;
+<<<<<<< HEAD
   date?: string;
   participants: string[];
   splitMethod: SplitMethod;
@@ -78,12 +90,17 @@ export interface Settlement {
   note: string;
   status: "confirmed";
   allocations: SettlementAllocation[];
+=======
+  participants: string[];
+  splitType: "equal";
+>>>>>>> origin/lauren/tasks
   createdAt: string;
 }
 
 export interface Balance {
   userId: string;
   name: string;
+<<<<<<< HEAD
   paid: number;          // total fronted as expense payer
   owed: number;          // gross from expense splits
   net: number;           // paid - owed (theoretical)
@@ -91,6 +108,11 @@ export interface Balance {
   settledIn: number;     // total received via recorded settlements
   outstanding: number;   // what this person still owes to others (after settlements)
   outstandingNet: number; // outstandingReceivable - outstanding
+=======
+  net: number;
+  paid: number;
+  owed: number;
+>>>>>>> origin/lauren/tasks
 }
 
 export interface FairnessRow {
@@ -107,6 +129,10 @@ export interface DashboardData {
   shoppingNeeded: ShoppingItem[];
   recentExpenses: Expense[];
   balances: Balance[];
+<<<<<<< HEAD
   settleUps: { from: string; fromId?: string; to: string; toId?: string; amount: number }[];
+=======
+  settleUps: { from: string; to: string; amount: number }[];
+>>>>>>> origin/lauren/tasks
   fairness: FairnessRow[];
 }
