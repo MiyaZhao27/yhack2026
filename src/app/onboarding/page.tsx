@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 
-import { Fredoka, Poppins } from "next/font/google";
 import { useRouter } from "next/navigation";
 
-const fredoka = Fredoka({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
-const poppins = Poppins({ subsets: ["latin"], weight: ["300", "400", "500", "600"] });
+const fredoka = { className: "" };
+const poppins = { className: "" };
 
 function Icon({ name, filled = false, size = 24, color }: { name: string; filled?: boolean; size?: number; color?: string }) {
   return (
@@ -43,7 +42,7 @@ function GhostNav() {
     { icon: "home", label: "Home" },
     { icon: "checklist", label: "Chores" },
     { icon: "add_circle", label: "Add" },
-    { icon: "shopping_cart", label: "Shopping" },
+    { icon: "sticky_note_2", label: "Notes" },
     { icon: "payments", label: "Finances" },
   ];
   return (
@@ -179,15 +178,15 @@ function FinancesSlide({ onNext }: { onNext: () => void }) {
   );
 }
 
-// ── Slide 2: Shopping ─────────────────────────────────────────────────────────
-function ShoppingSlide({ onNext }: { onNext: () => void }) {
+// ── Slide 2: Bulletin Board ───────────────────────────────────────────────────
+function BulletinBoardSlide({ onNext }: { onNext: () => void }) {
   return (
     <main className={`flex-grow flex flex-col items-center justify-center px-8 pt-20 pb-24 text-center max-w-lg mx-auto overflow-hidden w-full ${poppins.className}`}>
       {/* Hero illustration */}
       <div className="relative w-full mb-16">
         <div
           className="absolute rounded-full blur-3xl"
-          style={{ top: -40, right: -40, width: 256, height: 256, background: "#fc9923", opacity: 0.1 }}
+          style={{ top: -40, right: -40, width: 256, height: 256, background: "#f8b4c4", opacity: 0.18 }}
         />
         <div className="relative z-10 flex flex-col items-center">
           {/* Rotated image card */}
@@ -196,7 +195,7 @@ function ShoppingSlide({ onNext }: { onNext: () => void }) {
             style={{
               maxHeight: 320,
               aspectRatio: "1/1",
-              background: "#fcf0ff",
+              background: "#fff1d9",
               borderRadius: 40,
               transform: "rotate(3deg)",
             }}
@@ -204,21 +203,25 @@ function ShoppingSlide({ onNext }: { onNext: () => void }) {
             <div
               className="w-full h-full rounded-[20px] flex items-center justify-center"
               style={{
-                background: "linear-gradient(135deg, #1a2e1a 0%, #2d5a2d 100%)",
+                background: "linear-gradient(135deg, #fff8ef 0%, #fef3c7 100%)",
                 border: "4px solid #ffffff",
-                boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+                boxShadow: "0 20px 60px rgba(40,14,63,0.12)",
                 transform: "rotate(-3deg)",
                 overflow: "hidden",
               }}
             >
-              <div className="grid grid-cols-4 gap-2 p-4 opacity-80">
-                {["🥦", "🍎", "🥕", "🍋", "🥬", "🍇", "🧅", "🍊", "🥑", "🍅", "🌽", "🫐"].map((e, i) => (
+              <div className="grid grid-cols-3 gap-4 p-6 opacity-90">
+                {["Call plumber", "Movie night", "Wi-Fi reset", "Plant duty", "Trash out", "Eggs + milk"].map((item, i) => (
                   <div
                     key={i}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-                    style={{ background: "rgba(255,255,255,0.12)" }}
+                    className="flex h-20 w-20 items-center justify-center rounded-2xl p-3 text-center text-xs font-semibold"
+                    style={{
+                      background: ["#fca5a5", "#86efac", "#93c5fd", "#fde68a", "#f9a8d4", "#c4b5fd"][i],
+                      color: "#280e3f",
+                      transform: `rotate(${i % 2 === 0 ? "-" : ""}${3 + (i % 3)}deg)`,
+                    }}
                   >
-                    {e}
+                    {item}
                   </div>
                 ))}
               </div>
@@ -240,16 +243,16 @@ function ShoppingSlide({ onNext }: { onNext: () => void }) {
           >
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: "#ffd9e0" }}
+              style={{ background: "#d9e2ff" }}
             >
-              <Icon name="receipt_long" color="#6b002e" />
+              <Icon name="sticky_note_2" color="#0c306e" />
             </div>
             <div className="text-left">
               <p className={`text-[10px] uppercase tracking-wider font-bold ${poppins.className}`} style={{ color: "#8c5000" }}>
-                Receipt Scanned
+                Shared Board
               </p>
               <p className={`text-sm font-semibold ${poppins.className}`} style={{ color: "#280e3f" }}>
-                $42.50 split 3 ways
+                Quick notes for everyone
               </p>
             </div>
           </div>
@@ -259,16 +262,16 @@ function ShoppingSlide({ onNext }: { onNext: () => void }) {
       {/* Text */}
       <div className="space-y-6">
         <h1 className={`text-4xl font-bold leading-tight tracking-tight ${fredoka.className}`} style={{ color: "#280e3f" }}>
-          Shop for the suite,{" "}
+          Keep the suite on the same page,{" "}
           <br />
           <span className="italic" style={{ color: "#6b002e" }}>
-            not just for you.
+            without extra noise.
           </span>
         </h1>
         <p className="leading-relaxed text-sm md:text-base" style={{ color: "#564145" }}>
-          Keep the pantry stocked without the stress. Collaborate on{" "}
-          <strong style={{ color: "#280e3f" }}>shared shopping lists</strong> and split bills instantly with{" "}
-          <strong style={{ color: "#280e3f" }}>smart receipt scanning</strong>.
+          Drop quick reminders, plans, and tiny roommate asks on a shared{" "}
+          <strong style={{ color: "#280e3f" }}>interactive bulletin board</strong> that stays visible next to your
+          chores and balances.
         </p>
       </div>
 
@@ -436,7 +439,7 @@ export default function OnboardingPage() {
 
       {/* Slides */}
       {current === 0 && <FinancesSlide onNext={advance} />}
-      {current === 1 && <ShoppingSlide onNext={advance} />}
+      {current === 1 && <BulletinBoardSlide onNext={advance} />}
       {current === 2 && <ChoresSlide onNext={finish} />}
 
       <GhostNav />

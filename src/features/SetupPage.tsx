@@ -110,7 +110,7 @@ export function SetupPage() {
             Create a suite to get an invite code, then share it with your roommates so they can join.
           </p>
           <p>
-            Once everyone has joined, you can start tracking chores, shopping, and shared expenses together.
+            Once everyone has joined, you can start tracking chores, shared notes, and expenses together.
           </p>
         </div>
         <div className="mt-6 border-t border-slate-100 pt-6">

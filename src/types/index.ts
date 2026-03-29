@@ -35,15 +35,16 @@ export interface GoogleTaskItem {
   webViewLink?: string | null;
 }
 
-export interface ShoppingItem {
+export interface BulletinNote {
   _id: string;
   suiteId: string;
-  name: string;
-  quantity: number;
-  requestedBy: string;
-  category: "groceries" | "cleaning" | "household";
-  status: "needed" | "bought";
-  boughtBy?: string | null;
+  color: "red" | "green" | "blue" | "yellow";
+  text: string;
+  x: number;
+  y: number;
+  rotationDeg: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type SplitMethod = "equal" | "exact" | "percentage" | "itemized";
@@ -112,14 +113,12 @@ export interface FairnessRow {
   userId: string;
   name: string;
   tasksCompleted: number;
-  shoppingBought: number;
   expensesPaid: number;
 }
 
 export interface DashboardData {
   dueToday: Task[];
   overdue: Task[];
-  shoppingNeeded: ShoppingItem[];
   recentExpenses: Expense[];
   balances: Balance[];
   settleUps: { from: string; fromId?: string; to: string; toId?: string; amount: number }[];

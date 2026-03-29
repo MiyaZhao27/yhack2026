@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { authOptions } from "../../../../auth";
 import { connectDatabase } from "../../../../server/config/db";
 import { Expense } from "../../../../server/models/Expense";
-import { ShoppingItem } from "../../../../server/models/ShoppingItem";
 import { Task } from "../../../../server/models/Task";
 import { getFairnessSummary, getSuiteBalances } from "../../../../server/services/balanceService";
 import { isSameDay, normalizeTaskStatus } from "../../../../server/utils/date";
@@ -24,9 +23,8 @@ export async function GET(_request: Request, context: { params: Promise<{ suiteI
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const [tasks, shopping, expenses, balanceData, fairness] = await Promise.all([
+  const [tasks, expenses, balanceData, fairness] = await Promise.all([
     Task.find({ suiteId }).sort({ dueDate: 1 }).lean(),
-    ShoppingItem.find({ suiteId }).sort({ createdAt: -1 }).lean(),
     Expense.find({
       suiteId,
       $or: [{ paidBy: currentUserId }, { participants: currentUserId }],
@@ -38,7 +36,6 @@ export async function GET(_request: Request, context: { params: Promise<{ suiteI
     getFairnessSummary(suiteId),
   ]);
   const typedTasks = tasks as any[];
-  const typedShopping = shopping as any[];
   const typedExpenses = expenses as any[];
 
   const today = new Date();
@@ -52,7 +49,6 @@ export async function GET(_request: Request, context: { params: Promise<{ suiteI
       (task: any) => task.status !== "done" && isSameDay(new Date(task.dueDate), today)
     ),
     overdue: normalizedTasks.filter((task: any) => task.status === "overdue"),
-    shoppingNeeded: typedShopping.filter((item: any) => item.status === "needed"),
     recentExpenses: typedExpenses,
     balances: balanceData.balances,
     settleUps: balanceData.settleUps,

@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import { Fredoka, Poppins } from "next/font/google";
 import { useRouter } from "next/navigation";
 import { signIn, signOut, useSession } from "next-auth/react";
 
-const fredoka = Fredoka({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
-const poppins = Poppins({ subsets: ["latin"], weight: ["300", "400", "500", "600"] });
+const fredoka = { className: "" };
+const poppins = { className: "" };
 
 const phrases = [
   "people take out their trash",
