@@ -5,6 +5,7 @@ import { Settlement } from "../../../server/models/Settlement";
 import { getSuiteBalances } from "../../../server/services/balanceService";
 import { createSettlement, recomputeNetting } from "../../../server/services/settlementService";
 import { getSessionUserContext } from "../../../server/utils/sessionUser";
+import { userHasSuiteAccess } from "../../../server/utils/suiteMembership";
 
 export async function GET(request: NextRequest) {
   await connectDatabase();
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
   }
 
   const requestedSuiteId = request.nextUrl.searchParams.get("suiteId");
-  if (requestedSuiteId && requestedSuiteId !== current.suiteId) {
+  if (requestedSuiteId && !userHasSuiteAccess(current, requestedSuiteId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
   if (!suiteId || !payerId || !receiverId || !amount) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
-  if (suiteId !== current.suiteId) {
+  if (!userHasSuiteAccess(current, String(suiteId))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   if (payerId !== current.userId && receiverId !== current.userId) {

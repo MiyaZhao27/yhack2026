@@ -4,6 +4,7 @@ import { connectDatabase } from "../../../../server/config/db";
 import { Suite } from "../../../../server/models/Suite";
 import { User } from "../../../../server/models/User";
 import { getSessionUserContext } from "../../../../server/utils/sessionUser";
+import { buildSuiteMembershipQuery, userHasSuiteAccess } from "../../../../server/utils/suiteMembership";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   await connectDatabase();
@@ -14,7 +15,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   }
 
   const { id } = await context.params;
-  if (id !== currentUser.suiteId) {
+  if (!userHasSuiteAccess(currentUser, id)) {
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
@@ -24,7 +25,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ message: "Suite not found" }, { status: 404 });
   }
 
-  const members = (await User.find({ suiteId: suite._id }).lean()) as any[];
+  const members = (await User.find(buildSuiteMembershipQuery(String(suite._id))).lean()) as any[];
   return NextResponse.json({
     ...suite,
     _id: String(suite._id),
@@ -34,6 +35,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       ...member,
       _id: String(member._id),
       suiteId: member.suiteId ? String(member.suiteId) : member.suiteId,
+      activeSuiteId: member.activeSuiteId ? String(member.activeSuiteId) : member.activeSuiteId,
+      suiteIds: (member.suiteIds || []).map((suiteId: any) => String(suiteId)),
     })),
   });
 }

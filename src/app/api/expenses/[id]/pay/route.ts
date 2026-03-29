@@ -4,6 +4,7 @@ import { connectDatabase } from "../../../../../server/config/db";
 import { Expense } from "../../../../../server/models/Expense";
 import { getSuiteBalances } from "../../../../../server/services/balanceService";
 import { getSessionUserContext } from "../../../../../server/utils/sessionUser";
+import { userHasSuiteAccess } from "../../../../../server/utils/suiteMembership";
 
 // POST /api/expenses/:id/pay  { participantId }
 // Toggles paidAt on the matching split. Payer's own split cannot be toggled.
@@ -23,7 +24,7 @@ export async function POST(
 
   const expense = await Expense.findById(id);
   if (!expense) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (String(expense.suiteId) !== currentUser.suiteId) {
+  if (!userHasSuiteAccess(currentUser, String(expense.suiteId))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   if (String(participantId) !== currentUser.userId) {

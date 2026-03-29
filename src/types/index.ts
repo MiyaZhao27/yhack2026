@@ -1,7 +1,9 @@
 export interface Member {
   _id: string;
   name: string;
-  suiteId: string;
+  suiteId?: string | null;
+  suiteIds?: string[];
+  activeSuiteId?: string | null;
   email?: string;
 }
 

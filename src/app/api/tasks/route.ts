@@ -6,6 +6,8 @@ import { connectDatabase } from "../../../server/config/db";
 import { Task } from "../../../server/models/Task";
 import { createGoogleTaskForTask } from "../../../server/services/googleTasksService";
 import { normalizeTaskStatus, shouldShowTask } from "../../../server/utils/date";
+import { getSessionUserContext } from "../../../server/utils/sessionUser";
+import { userHasSuiteAccess } from "../../../server/utils/suiteMembership";
 
 function taskOrder(task: { status: string }) {
   if (task.status === "overdue") return 0;
@@ -16,9 +18,19 @@ function taskOrder(task: { status: string }) {
 export async function GET(request: NextRequest) {
   await connectDatabase();
 
-  const suiteId = request.nextUrl.searchParams.get("suiteId");
+  const currentUser = await getSessionUserContext();
+  if (!currentUser) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  const requestedSuiteId = request.nextUrl.searchParams.get("suiteId");
+  const suiteId = requestedSuiteId ?? currentUser.suiteId;
+  if (!suiteId || !userHasSuiteAccess(currentUser, suiteId)) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
+
   const now = new Date();
-  const tasks = (await Task.find(suiteId ? { suiteId } : {})
+  const tasks = (await Task.find({ suiteId })
     .sort({ dueDate: 1 })
     .lean()) as any[];
 
@@ -44,7 +56,16 @@ export async function POST(request: NextRequest) {
   await connectDatabase();
 
   const session = await getServerSession(authOptions);
+  const currentUser = await getSessionUserContext();
+  if (!session?.user?.id || !currentUser) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   const payload = await request.json();
+  if (!payload.suiteId || !userHasSuiteAccess(currentUser, String(payload.suiteId))) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
+
   const task = await Task.create({
     ...payload,
     status: normalizeTaskStatus(new Date(payload.dueDate), payload.status || "pending"),

@@ -73,7 +73,7 @@ export function SetupPage() {
               <input className="input" required value={name} onChange={(event) => setName(event.target.value)} />
             </div>
             <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-              Create your suite first, then share the generated code so other people can join it.
+              Create a new suite here to add it to your memberships. It becomes your active suite immediately, and you can switch between suites from the header anytime.
             </div>
             {createdCode ? (
               <div className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-900">

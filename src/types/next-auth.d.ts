@@ -6,6 +6,8 @@ declare module "next-auth" {
     user: {
       id?: string;
       suiteId?: string | null;
+      suiteIds?: string[];
+      activeSuiteId?: string | null;
       onboardingComplete?: boolean;
       name?: string | null;
       email?: string | null;
@@ -18,6 +20,8 @@ declare module "next-auth/jwt" {
   interface JWT {
     userId?: string;
     suiteId?: string | null;
+    suiteIds?: string[];
+    activeSuiteId?: string | null;
     onboardingComplete?: boolean;
     googleId?: string;
     googleAccessToken?: string;

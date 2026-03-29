@@ -6,6 +6,8 @@ import { connectDatabase } from "../../../../server/config/db";
 import { Task } from "../../../../server/models/Task";
 import { createGoogleTaskForTask } from "../../../../server/services/googleTasksService";
 import { normalizeTaskStatus } from "../../../../server/utils/date";
+import { getSessionUserContext } from "../../../../server/utils/sessionUser";
+import { userHasSuiteAccess } from "../../../../server/utils/suiteMembership";
 
 export async function PATCH(
   request: NextRequest,
@@ -13,10 +15,18 @@ export async function PATCH(
 ) {
   await connectDatabase();
 
+  const currentUser = await getSessionUserContext();
+  if (!currentUser) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await context.params;
   const payload = await request.json();
   const existing = await Task.findById(id).lean();
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!userHasSuiteAccess(currentUser, String((existing as any).suiteId))) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
 
   const dueDate = payload.dueDate ? new Date(payload.dueDate) : (existing as any).dueDate;
   const status = normalizeTaskStatus(dueDate, payload.status ?? (existing as any).status);
@@ -49,6 +59,9 @@ export async function POST(
 
   if (!task) {
     return NextResponse.json({ message: "Task not found" }, { status: 404 });
+  }
+  if (!userHasSuiteAccess(await getSessionUserContext(), String(task.suiteId))) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
   if (String(task.assigneeId) !== session.user.id) {

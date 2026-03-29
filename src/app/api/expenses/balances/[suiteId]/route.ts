@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { connectDatabase } from "../../../../../server/config/db";
 import { getSuiteBalances } from "../../../../../server/services/balanceService";
 import { getSessionUserContext } from "../../../../../server/utils/sessionUser";
+import { userHasSuiteAccess } from "../../../../../server/utils/suiteMembership";
 
 export async function GET(_request: Request, context: { params: Promise<{ suiteId: string }> }) {
   await connectDatabase();
@@ -13,7 +14,7 @@ export async function GET(_request: Request, context: { params: Promise<{ suiteI
   }
 
   const { suiteId } = await context.params;
-  if (suiteId !== currentUser.suiteId) {
+  if (!userHasSuiteAccess(currentUser, suiteId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

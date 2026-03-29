@@ -5,6 +5,7 @@ import { Settlement } from "../../../../server/models/Settlement";
 import { getSuiteBalances } from "../../../../server/services/balanceService";
 import { recomputeNetting } from "../../../../server/services/settlementService";
 import { getSessionUserContext } from "../../../../server/utils/sessionUser";
+import { userHasSuiteAccess } from "../../../../server/utils/suiteMembership";
 
 export async function DELETE(
   _request: NextRequest,
@@ -26,7 +27,7 @@ export async function DELETE(
   const receiverId = String(settlement.receiverId);
   const isInvolved = payerId === currentUser.userId || receiverId === currentUser.userId;
 
-  if (settlementSuiteId !== currentUser.suiteId || !isInvolved) {
+  if (!userHasSuiteAccess(currentUser, settlementSuiteId) || !isInvolved) {
     return NextResponse.json(
       { error: "You can only delete settlements that involve you." },
       { status: 403 }
