@@ -121,6 +121,7 @@ export interface FairnessRow {
 export interface DashboardData {
   dueToday: Task[];
   overdue: Task[];
+  upcoming: Task[];
   recentExpenses: Expense[];
   balances: Balance[];
   settleUps: { from: string; fromId?: string; to: string; toId?: string; amount: number }[];

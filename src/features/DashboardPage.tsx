@@ -35,7 +35,8 @@ export function DashboardPage() {
   const currentUserId = session?.user?.id ?? "";
   const myDueToday = (data?.dueToday || []).filter((task) => task.assigneeId === currentUserId);
   const myOverdue = (data?.overdue || []).filter((task) => task.assigneeId === currentUserId);
-  const myUrgentTasks = [...myDueToday, ...myOverdue].slice(0, 6);
+  const myUpcoming = (data?.upcoming || []).filter((task) => task.assigneeId === currentUserId);
+  const myUrgentTasks = [...myOverdue, ...myDueToday, ...myUpcoming].slice(0, 6);
 
   return (
     <div className="space-y-6">
@@ -60,12 +61,17 @@ export function DashboardPage() {
                   </span>
                 </div>
               ))}
-              {!myDueToday.length && !myOverdue.length ? (
-                <EmptyState label="No urgent tasks. The suite is in good shape." />
+              {!myDueToday.length && !myOverdue.length && !myUpcoming.length ? (
+                <EmptyState label="No current tasks for the next week. The suite is in good shape." />
               ) : null}
               {!!myDueToday.length && !myOverdue.length ? (
                 <div className="rounded-2xl bg-sky-50 p-4 text-sm text-sky-800">
                   Today is under control. Nothing is currently overdue.
+                </div>
+              ) : null}
+              {!myDueToday.length && !myOverdue.length && !!myUpcoming.length ? (
+                <div className="rounded-2xl bg-violet-50 p-4 text-sm text-violet-800">
+                  No urgent items today. Here is what is coming up over the next 7 days.
                 </div>
               ) : null}
               {!myDueToday.length && !!myOverdue.length ? (
