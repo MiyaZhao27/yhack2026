@@ -5,6 +5,7 @@ import { Expense } from "../../../server/models/Expense";
 import { getSuiteBalances } from "../../../server/services/balanceService";
 import { recomputeNetting } from "../../../server/services/settlementService";
 import { getSessionUserContext } from "../../../server/utils/sessionUser";
+import { userHasSuiteAccess } from "../../../server/utils/suiteMembership";
 import {
   computeEqualSplits,
   computeExactSplits,
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
   }
 
   const requestedSuiteId = request.nextUrl.searchParams.get("suiteId");
-  if (requestedSuiteId && requestedSuiteId !== current.suiteId) {
+  if (requestedSuiteId && !userHasSuiteAccess(current, requestedSuiteId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
   }
 
   const participantIds = (participants ?? []).map((id: unknown) => String(id));
-  if (suiteId !== current.suiteId) {
+  if (!userHasSuiteAccess(current, String(suiteId))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   if (String(paidBy) !== current.userId && !participantIds.includes(current.userId)) {

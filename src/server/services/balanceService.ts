@@ -2,6 +2,7 @@ import { Expense } from "../models/Expense";
 import { Settlement } from "../models/Settlement";
 import { Task } from "../models/Task";
 import { User } from "../models/User";
+import { buildSuiteMembershipQuery } from "../utils/suiteMembership";
 
 interface BalanceMember {
   userId: string;
@@ -17,7 +18,7 @@ interface BalanceMember {
 
 export async function getSuiteBalances(suiteId: string, userId?: string) {
   const [members, expenses, settlements] = (await Promise.all([
-    User.find({ suiteId }).lean(),
+    User.find(buildSuiteMembershipQuery(suiteId)).lean(),
     Expense.find({ suiteId }).lean(),
     Settlement.find({ suiteId, type: "payment" }).lean(),
   ])) as [any[], any[], any[]];
@@ -198,7 +199,7 @@ export async function getSuiteBalances(suiteId: string, userId?: string) {
 
 export async function getFairnessSummary(suiteId: string) {
   const [members, tasks, expenses] = (await Promise.all([
-    User.find({ suiteId }).lean(),
+    User.find(buildSuiteMembershipQuery(suiteId)).lean(),
     Task.find({ suiteId, status: "done" }).lean(),
     Expense.find({ suiteId }).lean(),
   ])) as [any[], any[], any[]];

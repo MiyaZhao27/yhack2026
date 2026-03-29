@@ -4,6 +4,7 @@ import Google from "next-auth/providers/google";
 import { connectDatabase } from "./server/config/db";
 import { User } from "./server/models/User";
 import { GOOGLE_TASKS_SCOPE } from "./server/services/googleTasksService";
+import { getResolvedActiveSuiteId, getSuiteMembershipIds, syncUserSuiteState } from "./server/utils/suiteMembership";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
@@ -64,6 +65,8 @@ export const authOptions: NextAuthOptions = {
             ...updatePayload,
             email: user.email.toLowerCase(),
             suiteId: null,
+            suiteIds: [],
+            activeSuiteId: null,
             onboardingComplete: false,
           });
 
@@ -88,6 +91,8 @@ export const authOptions: NextAuthOptions = {
         await existingUser.save();
       }
 
+      await syncUserSuiteState(dbUser);
+
       (user as typeof user & { id?: string; onboardingComplete?: boolean }).id = String(dbUser._id);
       (user as typeof user & { onboardingComplete?: boolean }).onboardingComplete =
         dbUser.onboardingComplete;
@@ -109,8 +114,12 @@ export const authOptions: NextAuthOptions = {
             : null;
 
       if (dbUser) {
+        const suiteIds = getSuiteMembershipIds(dbUser);
+        const activeSuiteId = getResolvedActiveSuiteId(dbUser);
         token.userId = String(dbUser._id);
-        token.suiteId = dbUser.suiteId ? String(dbUser.suiteId) : null;
+        token.suiteIds = suiteIds;
+        token.activeSuiteId = activeSuiteId;
+        token.suiteId = activeSuiteId;
         token.onboardingComplete = dbUser.onboardingComplete;
       }
 
@@ -128,6 +137,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.userId as string;
         session.user.suiteId = token.suiteId as string | null;
+        session.user.suiteIds = (token.suiteIds as string[] | undefined) ?? [];
+        session.user.activeSuiteId = token.activeSuiteId as string | null;
         session.user.onboardingComplete = token.onboardingComplete as boolean;
       }
       return session;

@@ -18,7 +18,7 @@ const navItems = [
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  const { suite, members } = useSuite();
+  const { suite, members, suites, activeSuiteId, setActiveSuite } = useSuite();
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const showSuiteDetails = status === "authenticated" && !!session?.user;
@@ -43,7 +43,27 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </p>
           </div>
           {showSuiteDetails ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-[minmax(180px,220px)_repeat(4,minmax(0,1fr))]">
+              <div className="rounded-2xl bg-white/85 px-4 py-3 shadow-sm ring-1 ring-slate-100">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Active Suite</p>
+                {suites.length ? (
+                  <select
+                    className="mt-2 w-full bg-transparent text-sm font-semibold text-slate-900 outline-none"
+                    value={activeSuiteId ?? ""}
+                    onChange={(event) => void setActiveSuite(event.target.value)}
+                  >
+                    {suites.map((suiteOption) => (
+                      <option key={suiteOption._id} value={suiteOption._id}>
+                        {suiteOption.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="mt-2 text-sm font-semibold text-slate-900">
+                    {suite?.name || "No suite selected"}
+                  </p>
+                )}
+              </div>
               {members.slice(0, 4).map((member) => (
                 <div key={member._id} className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Suitemate</p>

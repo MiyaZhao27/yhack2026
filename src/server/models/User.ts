@@ -10,6 +10,8 @@ export interface UserDocument {
   googleTokenExpiresAt?: Date | null;
   googleTasksListId?: string | null;
   suiteId?: Types.ObjectId | string | null;
+  suiteIds?: Array<Types.ObjectId | string>;
+  activeSuiteId?: Types.ObjectId | string | null;
   onboardingComplete: boolean;
 }
 
@@ -24,6 +26,8 @@ const userSchema = new Schema<UserDocument>(
     googleTokenExpiresAt: { type: Date, default: null },
     googleTasksListId: { type: String, default: null },
     suiteId: { type: Schema.Types.ObjectId, ref: "Suite", default: null },
+    suiteIds: [{ type: Schema.Types.ObjectId, ref: "Suite", default: [] }],
+    activeSuiteId: { type: Schema.Types.ObjectId, ref: "Suite", default: null },
     onboardingComplete: { type: Boolean, default: false },
   },
   { timestamps: true }
