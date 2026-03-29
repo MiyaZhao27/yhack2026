@@ -119,6 +119,12 @@ export function TasksPage({ currentUser }: TasksPageProps) {
   };
 
   const loadGoogleTasks = async () => {
+    if (!currentUser?.id) {
+      setGoogleTasks([]);
+      setGoogleTasksError(null);
+      return;
+    }
+
     try {
       const data = await api.get<GoogleTaskItem[]>("/google-calendar");
       setGoogleTasks(data);

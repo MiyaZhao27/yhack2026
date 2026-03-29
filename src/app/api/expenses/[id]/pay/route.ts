@@ -1,10 +1,9 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
-import { authOptions } from "../../../../../auth";
 import { connectDatabase } from "../../../../../server/config/db";
 import { Expense } from "../../../../../server/models/Expense";
 import { getSuiteBalances } from "../../../../../server/services/balanceService";
+import { getSessionUserContext } from "../../../../../server/utils/sessionUser";
 
 // POST /api/expenses/:id/pay  { participantId }
 // Toggles paidAt on the matching split. Payer's own split cannot be toggled.
@@ -14,10 +13,8 @@ export async function POST(
 ) {
   await connectDatabase();
 
-  const session = await getServerSession(authOptions);
-  const currentUserId = session?.user?.id ? String(session.user.id) : "";
-  const currentSuiteId = session?.user?.suiteId ? String(session.user.suiteId) : "";
-  if (!currentUserId || !currentSuiteId) {
+  const currentUser = await getSessionUserContext();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -26,10 +23,10 @@ export async function POST(
 
   const expense = await Expense.findById(id);
   if (!expense) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (String(expense.suiteId) !== currentSuiteId) {
+  if (String(expense.suiteId) !== currentUser.suiteId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (String(participantId) !== currentUserId) {
+  if (String(participantId) !== currentUser.userId) {
     return NextResponse.json(
       { error: "You can only toggle payment status for your own split." },
       { status: 403 }
@@ -52,6 +49,6 @@ export async function POST(
   await expense.save();
 
   const updatedExpense = await Expense.findById(id).lean();
-  const balanceData = await getSuiteBalances(String(expense.suiteId), currentUserId);
+  const balanceData = await getSuiteBalances(String(expense.suiteId), currentUser.userId);
   return NextResponse.json({ expense: updatedExpense, ...balanceData });
 }

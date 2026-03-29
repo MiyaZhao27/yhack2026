@@ -1,11 +1,10 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
-import { authOptions } from "../../../../auth";
 import { connectDatabase } from "../../../../server/config/db";
 import { Expense } from "../../../../server/models/Expense";
 import { getSuiteBalances } from "../../../../server/services/balanceService";
 import { recomputeNetting } from "../../../../server/services/settlementService";
+import { getSessionUserContext } from "../../../../server/utils/sessionUser";
 import {
   computeEqualSplits,
   computeExactSplits,
@@ -15,22 +14,13 @@ import {
   validatePercentageSplits,
 } from "../../../../lib/finance/calculations";
 
-async function getCurrentUserContext() {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.id ? String(session.user.id) : "";
-  const suiteId = session?.user?.suiteId ? String(session.user.suiteId) : "";
-
-  if (!userId || !suiteId) return null;
-  return { userId, suiteId };
-}
-
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   await connectDatabase();
 
-  const currentUser = await getCurrentUserContext();
+  const currentUser = await getSessionUserContext();
   if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -116,7 +106,7 @@ export async function DELETE(
 ) {
   await connectDatabase();
 
-  const currentUser = await getCurrentUserContext();
+  const currentUser = await getSessionUserContext();
   if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

@@ -1,25 +1,22 @@
-import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
-import { authOptions } from "../../../../auth";
 import { connectDatabase } from "../../../../server/config/db";
 import { Expense } from "../../../../server/models/Expense";
 import { Task } from "../../../../server/models/Task";
 import { getFairnessSummary, getSuiteBalances } from "../../../../server/services/balanceService";
+import { getSessionUserContext } from "../../../../server/utils/sessionUser";
 import { isSameDay, normalizeTaskStatus } from "../../../../server/utils/date";
 
 export async function GET(_request: Request, context: { params: Promise<{ suiteId: string }> }) {
   await connectDatabase();
 
-  const session = await getServerSession(authOptions);
-  const currentUserId = session?.user?.id ? String(session.user.id) : "";
-  const currentSuiteId = session?.user?.suiteId ? String(session.user.suiteId) : "";
-  if (!currentUserId || !currentSuiteId) {
+  const currentUser = await getSessionUserContext();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { suiteId } = await context.params;
-  if (suiteId !== currentSuiteId) {
+  if (suiteId !== currentUser.suiteId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -27,12 +24,12 @@ export async function GET(_request: Request, context: { params: Promise<{ suiteI
     Task.find({ suiteId }).sort({ dueDate: 1 }).lean(),
     Expense.find({
       suiteId,
-      $or: [{ paidBy: currentUserId }, { participants: currentUserId }],
+      $or: [{ paidBy: currentUser.userId }, { participants: currentUser.userId }],
     })
       .sort({ createdAt: -1 })
       .limit(5)
       .lean(),
-    getSuiteBalances(suiteId, currentUserId),
+    getSuiteBalances(suiteId, currentUser.userId),
     getFairnessSummary(suiteId),
   ]);
   const typedTasks = tasks as any[];

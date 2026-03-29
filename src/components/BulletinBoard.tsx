@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "../lib/api/client";
@@ -58,6 +59,7 @@ function findOpenPosition(notes: BulletinNote[], width: number, height: number) 
 
 export function BulletinBoard() {
   const { suite } = useSuite();
+  const { status } = useSession();
   const boardRef = useRef<HTMLDivElement | null>(null);
   const interactionRef = useRef(false);
   const notesRef = useRef<BulletinNote[]>([]);
@@ -155,7 +157,7 @@ export function BulletinBoard() {
   };
 
   const loadNotes = async (options?: { silent?: boolean }) => {
-    if (!suite?._id) {
+    if (!suite?._id || status !== "authenticated") {
       setNotes([]);
       setLoading(false);
       return;
@@ -182,7 +184,7 @@ export function BulletinBoard() {
 
   useEffect(() => {
     void loadNotes();
-  }, [suite?._id]);
+  }, [suite?._id, status]);
 
   useEffect(() => {
     if (!dragState) return;

@@ -1,11 +1,10 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
-import { authOptions } from "../../../auth";
 import { connectDatabase } from "../../../server/config/db";
 import { Expense } from "../../../server/models/Expense";
 import { getSuiteBalances } from "../../../server/services/balanceService";
 import { recomputeNetting } from "../../../server/services/settlementService";
+import { getSessionUserContext } from "../../../server/utils/sessionUser";
 import {
   computeEqualSplits,
   computeExactSplits,
@@ -15,19 +14,10 @@ import {
   validatePercentageSplits,
 } from "../../../lib/finance/calculations";
 
-async function getCurrentUserContext() {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.id ? String(session.user.id) : "";
-  const suiteId = session?.user?.suiteId ? String(session.user.suiteId) : "";
-
-  if (!userId || !suiteId) return null;
-  return { userId, suiteId };
-}
-
 export async function GET(request: NextRequest) {
   await connectDatabase();
 
-  const current = await getCurrentUserContext();
+  const current = await getSessionUserContext();
   if (!current) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -54,7 +44,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { suiteId, title, amount, paidBy, participants, splitMethod, splits, items, date } = body;
 
-  const current = await getCurrentUserContext();
+  const current = await getSessionUserContext();
   if (!current) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

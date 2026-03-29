@@ -1,25 +1,15 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
-import { authOptions } from "../../../auth";
 import { connectDatabase } from "../../../server/config/db";
 import { Settlement } from "../../../server/models/Settlement";
 import { getSuiteBalances } from "../../../server/services/balanceService";
 import { createSettlement, recomputeNetting } from "../../../server/services/settlementService";
-
-async function getCurrentUserContext() {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.id ? String(session.user.id) : "";
-  const suiteId = session?.user?.suiteId ? String(session.user.suiteId) : "";
-
-  if (!userId || !suiteId) return null;
-  return { userId, suiteId };
-}
+import { getSessionUserContext } from "../../../server/utils/sessionUser";
 
 export async function GET(request: NextRequest) {
   await connectDatabase();
 
-  const current = await getCurrentUserContext();
+  const current = await getSessionUserContext();
   if (!current) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -45,7 +35,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { suiteId, payerId, receiverId, amount, note } = body;
 
-  const current = await getCurrentUserContext();
+  const current = await getSessionUserContext();
   if (!current) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

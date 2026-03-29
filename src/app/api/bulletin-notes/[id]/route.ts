@@ -1,14 +1,13 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
-import { authOptions } from "../../../../auth";
 import { connectDatabase } from "../../../../server/config/db";
 import { BulletinNote } from "../../../../server/models/BulletinNote";
+import { getSessionUserContext } from "../../../../server/utils/sessionUser";
 
 async function getAuthorizedNote(id: string) {
-  const session = await getServerSession(authOptions);
-  const sessionSuiteId = session?.user?.suiteId ? String(session.user.suiteId) : "";
-  if (!sessionSuiteId) {
+  const currentUser = await getSessionUserContext();
+  const sessionSuiteId = currentUser?.suiteId ?? "";
+  if (!currentUser || !sessionSuiteId) {
     return { sessionSuiteId, note: null, unauthorized: true };
   }
 

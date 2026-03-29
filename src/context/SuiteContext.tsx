@@ -59,6 +59,7 @@ export function SuiteProvider({ children }: { children: ReactNode }) {
         setSuite(suiteData);
         setMembers(suiteData.members || []);
       } catch {
+        localStorage.removeItem(STORAGE_KEY);
         clearSuiteState();
       }
     } finally {

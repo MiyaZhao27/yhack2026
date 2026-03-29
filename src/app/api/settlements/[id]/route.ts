@@ -1,11 +1,10 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
-import { authOptions } from "../../../../auth";
 import { connectDatabase } from "../../../../server/config/db";
 import { Settlement } from "../../../../server/models/Settlement";
 import { getSuiteBalances } from "../../../../server/services/balanceService";
 import { recomputeNetting } from "../../../../server/services/settlementService";
+import { getSessionUserContext } from "../../../../server/utils/sessionUser";
 
 export async function DELETE(
   _request: NextRequest,
@@ -13,10 +12,8 @@ export async function DELETE(
 ) {
   await connectDatabase();
 
-  const session = await getServerSession(authOptions);
-  const currentUserId = session?.user?.id ? String(session.user.id) : "";
-  const currentSuiteId = session?.user?.suiteId ? String(session.user.suiteId) : "";
-  if (!currentUserId || !currentSuiteId) {
+  const currentUser = await getSessionUserContext();
+  if (!currentUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -27,9 +24,9 @@ export async function DELETE(
   const settlementSuiteId = String(settlement.suiteId);
   const payerId = String(settlement.payerId);
   const receiverId = String(settlement.receiverId);
-  const isInvolved = payerId === currentUserId || receiverId === currentUserId;
+  const isInvolved = payerId === currentUser.userId || receiverId === currentUser.userId;
 
-  if (settlementSuiteId !== currentSuiteId || !isInvolved) {
+  if (settlementSuiteId !== currentUser.suiteId || !isInvolved) {
     return NextResponse.json(
       { error: "You can only delete settlements that involve you." },
       { status: 403 }
@@ -38,6 +35,6 @@ export async function DELETE(
 
   await Settlement.findByIdAndDelete(id);
   await recomputeNetting(settlementSuiteId);
-  const balanceData = await getSuiteBalances(settlementSuiteId, currentUserId);
+  const balanceData = await getSuiteBalances(settlementSuiteId, currentUser.userId);
   return NextResponse.json(balanceData);
 }

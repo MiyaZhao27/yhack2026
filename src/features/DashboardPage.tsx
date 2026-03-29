@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 
 import { api } from "../lib/api/client";
 import { BulletinBoard } from "../components/BulletinBoard";
@@ -12,11 +13,19 @@ import { DashboardData } from "../types";
 export function DashboardPage() {
   const { suite, members } = useSuite();
   const [data, setData] = useState<DashboardData | null>(null);
+  const { status } = useSession();
 
   useEffect(() => {
-    if (!suite?._id) return;
-    void api.get<DashboardData>(`/dashboard/${suite._id}`).then(setData);
-  }, [suite?._id]);
+    if (!suite?._id || status !== "authenticated") {
+      setData(null);
+      return;
+    }
+
+    void api
+      .get<DashboardData>(`/dashboard/${suite._id}`)
+      .then(setData)
+      .catch(() => setData(null));
+  }, [suite?._id, status]);
 
   if (!suite) {
     return <EmptyState label="Create a suite on Setup to unlock the dashboard." />;

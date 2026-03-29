@@ -18,7 +18,7 @@ type SettleUp = { from: string; fromId?: string; to: string; toId?: string; amou
 
 export function FinancePage() {
   const { suite, members } = useSuite();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const currentUserId = session?.user?.id ?? "";
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
@@ -36,7 +36,7 @@ export function FinancePage() {
   const [filterUser, setFilterUser] = useState("");
 
   const loadAll = async () => {
-    if (!suite?._id) return;
+    if (!suite?._id || status !== "authenticated") return;
     const [expenseData, settlementData, balanceData] = await Promise.all([
       api.get<Expense[]>(`/expenses?suiteId=${suite._id}`),
       api.get<Settlement[]>(`/settlements?suiteId=${suite._id}`),
@@ -49,8 +49,15 @@ export function FinancePage() {
   };
 
   useEffect(() => {
+    if (status !== "authenticated") {
+      setExpenses([]);
+      setSettlements([]);
+      setBalances([]);
+      setSettleUps([]);
+      return;
+    }
     void loadAll();
-  }, [suite?._id]);
+  }, [suite?._id, status]);
 
   // For each expense: Map<expenseId, Map<debtorId, settledAmount>>
   const splitAllocations = useMemo(() => {
