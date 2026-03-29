@@ -190,13 +190,6 @@ export function FinancePage() {
                     ? `-${formatCurrency(-myNet)}`
                     : formatCurrency(0)}
               </p>
-              <p className="mt-1 text-sm text-muted">
-                {myNet > 0.005
-                  ? `You are owed ${formatCurrency(myOwed)}`
-                  : myNet < -0.005
-                    ? `You owe ${formatCurrency(myOwes)}`
-                    : "You are settled up"}
-              </p>
             </div>
 
             <div className="surface-soft rounded-2xl px-4 py-4">

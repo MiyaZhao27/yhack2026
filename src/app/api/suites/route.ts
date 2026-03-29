@@ -6,7 +6,6 @@ import { authOptions } from "../../../auth";
 import { connectDatabase } from "../../../server/config/db";
 import { Suite } from "../../../server/models/Suite";
 import { User } from "../../../server/models/User";
-import { getSuiteBalances } from "../../../server/services/balanceService";
 import { generateInviteCode } from "../../../server/utils/inviteCode";
 
 function serializeMember(member: any) {
@@ -36,8 +35,52 @@ async function getOrCreateCurrentUser(session: any) {
   return currentUser;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   await connectDatabase();
+  const mineOnly = request.nextUrl.searchParams.get("mine") === "1";
+
+  if (mineOnly) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    const currentUser = await getOrCreateCurrentUser(session);
+    const suites = (await Suite.find({ memberIds: currentUser._id }).sort({ createdAt: -1 }).lean()) as any[];
+    const uniqueMemberIds = Array.from(
+      new Set(
+        suites
+          .flatMap((suite) => (suite.memberIds || []).map((memberId: any) => String(memberId)))
+          .filter(Boolean)
+      )
+    );
+    const suiteMembers = uniqueMemberIds.length
+      ? ((await User.find({ _id: { $in: uniqueMemberIds } }).lean()) as any[])
+      : [];
+    const membersById = new Map(
+      suiteMembers.map((member) => [String(member._id), serializeMember(member)])
+    );
+
+    return NextResponse.json(
+      suites.map((suite) => {
+        const memberIds = (suite.memberIds || []).map((memberId: any) => String(memberId));
+        return {
+          ...suite,
+          _id: String(suite._id),
+          memberIds,
+          inviteCode: suite.inviteCode,
+          members: memberIds
+            .map((memberId: string) => membersById.get(memberId))
+            .filter(
+              (
+                member: ReturnType<typeof serializeMember> | undefined
+              ): member is ReturnType<typeof serializeMember> => member !== undefined
+            ),
+        };
+      })
+    );
+  }
+
   const suites = (await Suite.find().lean()) as any[];
   return NextResponse.json(
     suites.map((suite) => ({
@@ -63,25 +106,6 @@ export async function POST(request: NextRequest) {
 
     const currentUser = await getOrCreateCurrentUser(session);
     const previousSuiteId = currentUser.suiteId ? String(currentUser.suiteId) : null;
-
-    if (previousSuiteId && Types.ObjectId.isValid(previousSuiteId)) {
-      const { balances } = await getSuiteBalances(previousSuiteId, String(currentUser._id));
-      const currentBalance = balances.find(
-        (balance) => balance.userId === String(currentUser._id)
-      );
-      const outstandingDebt = currentBalance?.outstanding ?? 0;
-
-      if (outstandingDebt > 0.005) {
-        return NextResponse.json(
-          {
-            message: `Settle your outstanding debt ($${outstandingDebt.toFixed(
-              2
-            )}) before creating a new suite.`,
-          },
-          { status: 400 }
-        );
-      }
-    }
 
     const suite = await Suite.create({
       name,

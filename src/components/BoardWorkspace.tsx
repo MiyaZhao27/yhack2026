@@ -23,8 +23,8 @@ const BULLETIN_SPAWN_ZONE = {
 };
 const HOME_ZONE = { x: 810, y: 80, width: 460 };
 const FINANCE_ZONE = { x: 1300, y: 80, width: 1440 };
-const TASKS_ZONE = { x: 80, y: 820, width: 1520 };
-const PEOPLE_ZONE = { x: 1840, y: 820, width: 1080 };
+const TASKS_ZONE = { x: 80, y: 930, width: 1520 };
+const PEOPLE_ZONE = { x: 1840, y: 930, width: 1080 };
 
 const sectionMeta: Array<{ id: BoardSectionId; label: string; icon: typeof Home }> = [
   { id: "home", label: "Home", icon: Home },

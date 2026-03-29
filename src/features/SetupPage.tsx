@@ -8,8 +8,7 @@ import { api } from "../lib/api/client";
 import { EmptyState } from "../components/EmptyState";
 import { SectionCard } from "../components/SectionCard";
 import { useSuite } from "../context/SuiteContext";
-import { formatCurrency } from "../lib/ui/format";
-import { Balance, Member } from "../types";
+import { Member, Suite } from "../types";
 
 function initials(value: string) {
   const parts = value
@@ -27,7 +26,7 @@ function isCurrentUserMember(member: Member, userId?: string, userEmail?: string
 }
 
 export function SetupPage() {
-  const { createSuite, joinSuite, suite, members } = useSuite();
+  const { createSuite, joinSuite, suite, members, refreshSuite } = useSuite();
   const { data: session } = useSession();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -35,8 +34,8 @@ export function SetupPage() {
   const [name, setName] = useState(suite?.name || "New Suite");
   const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [outstandingDebt, setOutstandingDebt] = useState(0);
-  const [loadingDebt, setLoadingDebt] = useState(false);
+  const [memberSuites, setMemberSuites] = useState<Suite[]>([]);
+  const [switchingSuiteId, setSwitchingSuiteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (suite?.name) {
@@ -45,23 +44,16 @@ export function SetupPage() {
   }, [suite?.name]);
 
   useEffect(() => {
-    if (!suite?._id || !session?.user?.id) {
-      setOutstandingDebt(0);
+    if (!session?.user?.id) {
+      setMemberSuites([]);
       return;
     }
 
-    setLoadingDebt(true);
     void api
-      .get<{ balances: Balance[]; settleUps: Array<{ fromId?: string; toId?: string; amount: number }> }>(
-        `/expenses/balances/${suite._id}`
-      )
-      .then((data) => {
-        const mine = data.balances.find((balance) => balance.userId === session.user.id);
-        setOutstandingDebt(Math.max(0, mine?.outstanding ?? 0));
-      })
-      .catch(() => setOutstandingDebt(0))
-      .finally(() => setLoadingDebt(false));
-  }, [suite?._id, session?.user?.id]);
+      .get<Suite[]>("/suites?mine=1")
+      .then((data) => setMemberSuites(Array.isArray(data) ? data : []))
+      .catch(() => setMemberSuites([]));
+  }, [session?.user?.id, suite?._id]);
 
   const suitemates = useMemo(
     () =>
@@ -71,20 +63,25 @@ export function SetupPage() {
     [members, session?.user?.email, session?.user?.id]
   );
 
-  const blockedByDebt = outstandingDebt > 0.005;
+  const suitesForDisplay = useMemo(() => {
+    const suiteMap = new Map<string, Suite>();
+    for (const userSuite of memberSuites) {
+      suiteMap.set(userSuite._id, userSuite);
+    }
+
+    if (suite?._id) {
+      suiteMap.set(suite._id, {
+        ...suite,
+        members: suite.members?.length ? suite.members : members,
+      });
+    }
+
+    return Array.from(suiteMap.values());
+  }, [memberSuites, members, suite]);
 
   const handleCreateSuite = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
-
-    if (blockedByDebt) {
-      setError(
-        `You must settle your outstanding debt of ${formatCurrency(
-          outstandingDebt
-        )} before creating a new suite.`
-      );
-      return;
-    }
 
     try {
       await createSuite(name);
@@ -98,21 +95,25 @@ export function SetupPage() {
     event.preventDefault();
     setError(null);
 
-    if (blockedByDebt) {
-      setError(
-        `You must settle your outstanding debt of ${formatCurrency(
-          outstandingDebt
-        )} before joining another suite.`
-      );
-      return;
-    }
-
     try {
       await joinSuite(inviteCode);
       setShowJoinModal(false);
       setInviteCode("");
     } catch (joinError) {
       setError(joinError instanceof Error ? joinError.message : "Failed to join suite");
+    }
+  };
+
+  const handleSwitchSuite = async (suiteId: string) => {
+    if (!suiteId || suiteId === suite?._id) return;
+    setError(null);
+    setSwitchingSuiteId(suiteId);
+    try {
+      await refreshSuite(suiteId);
+    } catch (switchError) {
+      setError(switchError instanceof Error ? switchError.message : "Failed to switch suite");
+    } finally {
+      setSwitchingSuiteId(null);
     }
   };
 
@@ -232,17 +233,10 @@ export function SetupPage() {
             <div className="mb-3 rounded-2xl bg-[#ffe0ea] px-4 py-3 text-sm font-medium text-[#8f1d3a]">{error}</div>
           ) : null}
 
-          {blockedByDebt ? (
-            <div className="mb-3 rounded-2xl bg-[#ffe0ea] px-4 py-3 text-sm font-medium text-[#8f1d3a]">
-              You must settle {formatCurrency(outstandingDebt)} before creating or joining another suite.
-            </div>
-          ) : null}
-
           <div className="grid gap-2 sm:grid-cols-2">
             <button
               className="button-primary w-full"
               type="button"
-              disabled={blockedByDebt || loadingDebt}
               onClick={() => {
                 setError(null);
                 setShowCreateModal(true);
@@ -253,7 +247,6 @@ export function SetupPage() {
             <button
               className="button-secondary w-full"
               type="button"
-              disabled={blockedByDebt || loadingDebt}
               onClick={() => {
                 setError(null);
                 setShowJoinModal(true);
@@ -261,6 +254,50 @@ export function SetupPage() {
             >
               Join Suite
             </button>
+          </div>
+
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted">Your Suites</p>
+            {suitesForDisplay.length ? (
+              <div className="grid gap-2">
+                {suitesForDisplay.map((membershipSuite) => {
+                  const isCurrentSuite = suite?._id === membershipSuite._id;
+                  return (
+                    <div
+                      key={membershipSuite._id}
+                      className={`rounded-2xl border px-3 py-3 ${
+                        isCurrentSuite
+                          ? "surface-tint border-[#e6cfdd]"
+                          : "surface-soft border-[rgba(108,73,118,0.15)]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-[#2a1738]">{membershipSuite.name}</p>
+                          <p className="text-xs text-muted">
+                            Code: {membershipSuite.inviteCode || "Unavailable"}
+                          </p>
+                        </div>
+                        <button
+                          className={isCurrentSuite ? "button-secondary" : "button-primary"}
+                          type="button"
+                          disabled={isCurrentSuite || switchingSuiteId === membershipSuite._id}
+                          onClick={() => void handleSwitchSuite(membershipSuite._id)}
+                        >
+                          {isCurrentSuite
+                            ? "Active"
+                            : switchingSuiteId === membershipSuite._id
+                            ? "Switching..."
+                            : "Switch"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState label="No suites yet." />
+            )}
           </div>
 
           <div className="mt-5 border-t border-[rgba(108,73,118,0.2)] pt-4">
