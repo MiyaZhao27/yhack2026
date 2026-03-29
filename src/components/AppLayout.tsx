@@ -32,7 +32,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <header className="glass-card mb-6 overflow-hidden">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="pill bg-sky-100 text-sky-700">LiveWell</div>
+            <div className="pill bg-sky-100 text-sky-700">SuiteEase</div>
             <h1 className="mt-3 text-3xl font-semibold text-slate-900">
               {showSuiteDetails ? suite?.name || "Shared living, handled." : "Shared living, handled."}
             </h1>

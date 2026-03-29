@@ -98,7 +98,7 @@ export async function createCalendarEventForTask(
     body: JSON.stringify({
       summary: task.title,
       description:
-        [task.notes?.trim(), task.recurrence === "none" ? "Created by LiveWell" : `Created by LiveWell (${task.recurrence} chore)`]
+        [task.notes?.trim(), task.recurrence === "none" ? "Created by SuiteEase" : `Created by SuiteEase (${task.recurrence} chore)`]
           .filter(Boolean)
           .join("\n\n"),
       start: { dateTime: start.toISOString() },

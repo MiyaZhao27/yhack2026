@@ -84,7 +84,7 @@ function buildTaskNotes(task: { notes?: string | null; recurrence: string }) {
     parts.push(`Repeats: ${task.recurrence}`);
   }
 
-  parts.push("Created by LiveWell");
+  parts.push("Created by SuiteEase");
   return parts.join("\n\n");
 }
 
