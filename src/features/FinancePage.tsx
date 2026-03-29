@@ -2,6 +2,7 @@
 
 import { useMemo, useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { useSession } from "next-auth/react";
 
 import { api } from "../lib/api/client";
 import { EmptyState } from "../components/EmptyState";
@@ -17,6 +18,8 @@ type SettleUp = { from: string; fromId?: string; to: string; toId?: string; amou
 
 export function FinancePage() {
   const { suite, members } = useSuite();
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id ?? "";
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [settleUps, setSettleUps] = useState<SettleUp[]>([]);
@@ -146,6 +149,7 @@ export function FinancePage() {
         <RecordPaymentModal
           members={members}
           suiteId={suite._id}
+          currentUserId={currentUserId}
           prefill={paymentPrefill}
           onSuccess={() => {
             setShowPayment(false);

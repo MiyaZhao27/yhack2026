@@ -20,7 +20,7 @@ export async function createSettlement(input: {
   payerId: string;
   receiverId: string;
   amount: number;
-  date: Date;
+  date?: Date;
   note?: string;
 }) {
   const expenses = (await Expense.find({
@@ -44,7 +44,10 @@ export async function createSettlement(input: {
         String(a.creditorId) === input.receiverId
       ) {
         const expenseId = String(a.expenseId);
-        priorAllocated.set(expenseId, (priorAllocated.get(expenseId) ?? 0) + a.amount);
+        priorAllocated.set(
+          expenseId,
+          Number(((priorAllocated.get(expenseId) ?? 0) + a.amount).toFixed(2))
+        );
       }
     }
   }
@@ -59,13 +62,15 @@ export async function createSettlement(input: {
       const split = expense.splits.find(
         (s: any) => String(s.participantId) === input.payerId
       );
-      owedAmount = split?.owedAmount ?? 0;
+      owedAmount = Number((split?.owedAmount ?? 0).toFixed(2));
     } else {
       const isParticipant = (expense.participants ?? []).some(
         (p: any) => String(p) === input.payerId
       );
       if (isParticipant) {
-        owedAmount = expense.amount / (expense.participants?.length || 1);
+        owedAmount = Number(
+          (expense.amount / (expense.participants?.length || 1)).toFixed(2)
+        );
       }
     }
 
@@ -87,11 +92,9 @@ export async function createSettlement(input: {
 
   if (input.amount > totalOpen + 0.005) {
     throw new Error(
-      `Payment of $${input.amount.toFixed(
+      `Maximum payment allowed from this payer to this payee is $${totalOpen.toFixed(
         2
-      )} exceeds open obligations of $${totalOpen.toFixed(
-        2
-      )} from this payer to this receiver`
+      )}. You entered $${input.amount.toFixed(2)}.`
     );
   }
 
@@ -120,7 +123,7 @@ export async function createSettlement(input: {
     payerId: input.payerId,
     receiverId: input.receiverId,
     amount: Number(input.amount.toFixed(2)),
-    date: input.date,
+    date: input.date ?? new Date(),
     note: input.note ?? "",
     status: "confirmed",
     type: "payment",
