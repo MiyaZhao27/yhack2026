@@ -5,10 +5,10 @@ import { PointerEvent, useEffect, useRef, useState } from "react";
 import { BulletinNote } from "../types";
 
 const colorClasses: Record<BulletinNote["color"], string> = {
-  red: "bg-rose-200/95 text-rose-950",
-  green: "bg-emerald-200/95 text-emerald-950",
-  blue: "text-sky-950",
-  yellow: "bg-amber-200/95 text-amber-950",
+  red: "bg-rose-100 text-rose-950 border-t-[6px] border-rose-200",
+  green: "bg-emerald-100 text-emerald-950 border-t-[6px] border-emerald-200",
+  blue: "text-sky-950 border-t-[6px] border-sky-200",
+  yellow: "bg-amber-100 text-amber-950 border-t-[6px] border-amber-200",
 };
 
 const colorStyles: Record<BulletinNote["color"], { backgroundColor?: string }> = {
@@ -57,8 +57,8 @@ export function StickyNote({
 
   return (
     <div
-      className={`absolute rounded-none border border-white/60 shadow-[0_18px_30px_rgba(15,23,42,0.16)] ${colorClasses[note.color]} ${
-        isDragging ? "z-30 cursor-grabbing transition-none" : "z-10 cursor-grab transition-[left,top,transform,box-shadow] duration-200"
+      className={`absolute rounded-none border border-black/5 ${colorClasses[note.color]} ${
+        isDragging ? "z-30 cursor-grabbing transition-none" : "z-10 cursor-grab transition-[left,top,transform,box-shadow] duration-200 hover:scale-[1.03]"
       }`}
       style={{
         left: note.x,
@@ -67,6 +67,7 @@ export function StickyNote({
         height: STICKY_NOTE_HEIGHT,
         transform: `rotate(${note.rotationDeg}deg)`,
         ...colorStyles[note.color],
+        boxShadow: "2px 4px 12px rgba(0,0,0,0.08)",
       }}
       onPointerDown={(event) => {
         if (isEditing) return;
@@ -89,7 +90,8 @@ export function StickyNote({
         {isEditing ? (
           <textarea
             ref={textareaRef}
-            className="h-full w-full resize-none bg-transparent text-sm leading-6 text-inherit outline-none placeholder:text-slate-500/70"
+            className="h-full w-full resize-none bg-transparent text-lg leading-6 text-inherit outline-none placeholder:text-slate-500/70"
+            style={{ fontFamily: '"Gochi Hand", cursive' }}
             placeholder="Leave a quick note..."
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
@@ -108,7 +110,9 @@ export function StickyNote({
             }}
           />
         ) : (
-          <p className="max-h-full overflow-hidden whitespace-pre-wrap text-sm font-medium leading-6">{note.text}</p>
+          <p className="max-h-full overflow-hidden whitespace-pre-wrap text-lg leading-6" style={{ fontFamily: '"Gochi Hand", cursive' }}>
+            {note.text}
+          </p>
         )}
       </div>
     </div>

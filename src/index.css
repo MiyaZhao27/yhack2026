@@ -4,24 +4,41 @@
 
 @layer base {
   body {
-    @apply bg-slate-100 text-slate-900 antialiased;
-    background-image: radial-gradient(circle at top left, rgba(186, 230, 253, 0.65), transparent 28%),
-      radial-gradient(circle at top right, rgba(254, 249, 195, 0.6), transparent 22%),
-      linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+    @apply antialiased;
+    background-color: #fff7fe;
+    background-image:
+      radial-gradient(circle at top left, rgba(255, 217, 224, 0.72), transparent 28%),
+      radial-gradient(circle at top right, rgba(255, 220, 191, 0.58), transparent 22%),
+      radial-gradient(circle at bottom center, rgba(217, 226, 255, 0.45), transparent 24%),
+      linear-gradient(180deg, #fff7fe 0%, #fcf0ff 58%, #f8e9ff 100%);
+    color: #280e3f;
+    font-family: "Poppins", system-ui, sans-serif;
+    overflow-x: hidden;
   }
 
   * {
     @apply border-slate-200;
   }
+
+  h1,
+  h2,
+  h3,
+  .font-headline {
+    font-family: "Fredoka", system-ui, sans-serif;
+  }
 }
 
 @layer components {
   .app-shell {
-    @apply mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 lg:px-8;
+    @apply mx-auto min-h-screen max-w-7xl px-4 pb-8 pt-6 sm:px-6 lg:px-8;
   }
 
   .glass-card {
-    @apply rounded-3xl border border-white/70 bg-white/80 p-5 shadow-card backdrop-blur;
+    @apply border p-5 backdrop-blur;
+    border-radius: 2rem;
+    border-color: rgba(220, 191, 196, 0.24);
+    background: rgba(255, 247, 254, 0.82);
+    box-shadow: 0 8px 24px rgba(40, 14, 63, 0.06);
   }
 
   .pill {
@@ -29,14 +46,52 @@
   }
 
   .input {
-    @apply w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200;
+    @apply w-full rounded-2xl px-4 py-3 text-sm outline-none transition;
+    border: 1px solid rgba(220, 191, 196, 0.5);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    color: #280e3f;
+  }
+
+  .input:focus {
+    border-color: #8b1d44;
+    box-shadow: 0 0 0 4px rgba(139, 29, 68, 0.08);
   }
 
   .button-primary {
-    @apply rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700;
+    @apply rounded-2xl px-4 py-3 text-sm font-semibold text-white transition;
+    background: linear-gradient(135deg, #6b002e 0%, #8b1d44 100%);
+    box-shadow: 0 8px 24px rgba(107, 0, 46, 0.18);
+  }
+
+  .button-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 28px rgba(107, 0, 46, 0.22);
   }
 
   .button-secondary {
-    @apply rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50;
+    @apply rounded-2xl px-4 py-3 text-sm font-semibold transition;
+    border: 1px solid rgba(220, 191, 196, 0.6);
+    background: rgba(255, 255, 255, 0.9);
+    color: #564145;
+  }
+
+  .button-secondary:hover {
+    background: rgba(244, 226, 255, 0.85);
+  }
+
+  .glass-nav {
+    background: rgba(255, 247, 254, 0.72);
+    backdrop-filter: blur(16px);
+  }
+
+  .editorial-shadow {
+    box-shadow: 0 8px 24px rgba(40, 14, 63, 0.06);
+  }
+
+  .cork-texture {
+    background-color: #e5ba94;
+    background-image: radial-gradient(#d4a373 1px, transparent 0);
+    background-size: 8px 8px;
   }
 }

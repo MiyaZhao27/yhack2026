@@ -297,9 +297,9 @@ export function BulletinBoard() {
     >
       <div
         ref={boardRef}
-        className="relative min-h-[420px] overflow-hidden rounded-[28px] border border-dashed border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.95),_rgba(248,250,252,0.95))]"
+        className="cork-texture relative min-h-[420px] overflow-hidden rounded-[32px] border border-[#d4a373]/40 p-2 shadow-inner"
       >
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.24)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.24)_1px,transparent_1px)] bg-[size:26px_26px]" />
+        <div className="pointer-events-none absolute inset-0 bg-black/5" />
         {error ? (
           <div className="absolute left-4 right-4 top-4 z-40 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {error}

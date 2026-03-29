@@ -29,10 +29,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-shell">
-      <header className="glass-card mb-6 overflow-hidden">
+      <header className="glass-card glass-nav mb-6 overflow-hidden">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="pill bg-sky-100 text-sky-700">SuiteEase</div>
+            <div className="font-headline text-3xl font-bold tracking-tight text-[#8b1d44]">SuiteEase</div>
             <h1 className="mt-3 text-3xl font-semibold text-slate-900">
               {showSuiteDetails ? suite?.name || "Shared living, handled." : "Shared living, handled."}
             </h1>
@@ -45,9 +45,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
           {showSuiteDetails ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {members.slice(0, 4).map((member) => (
-                <div key={member._id} className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Suitemate</p>
-                  <p className="mt-1 text-sm font-semibold">{member.name}</p>
+                <div key={member._id} className="editorial-shadow rounded-[24px] border border-white/70 bg-white/85 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#897175]">Suitemate</p>
+                  <p className="mt-1 text-sm font-semibold text-[#280e3f]">{member.name}</p>
                 </div>
               ))}
             </div>
@@ -62,8 +62,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
             href={href}
             className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
               pathname === href
-                ? "bg-slate-900 text-white shadow-card"
-                : "bg-white/80 text-slate-700 hover:bg-white"
+                ? "editorial-shadow bg-[#8b1d44] text-white"
+                : "bg-white/85 text-[#564145] hover:bg-[#f4e2ff]"
             }`}
           >
             <Icon size={16} />
