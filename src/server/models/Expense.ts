@@ -34,7 +34,7 @@ const expenseSplitSchema = new Schema(
 const expenseItemSchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
-    amount: { type: Number, required: true, min: 0 },
+    amount: { type: Number, required: true },
     assignedParticipants: [{ type: Schema.Types.ObjectId, ref: "User" }],
   },
   { _id: false }

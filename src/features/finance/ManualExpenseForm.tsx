@@ -3,14 +3,16 @@
 import { FormEvent, useState } from "react";
 
 import {
+  applyProportionalFees,
   computeEqualSplits,
   computeExactSplits,
+  computeItemizedSplits,
   computePercentageSplits,
   validateExactSplits,
   validatePercentageSplits,
 } from "../../lib/finance/calculations";
 import { formatCurrency } from "../../lib/ui/format";
-import { ExpenseSplit, Member, SplitMethod } from "../../types";
+import { ExpenseItem, ExpenseSplit, Member, SplitMethod } from "../../types";
 
 export interface ManualExpenseData {
   title: string;
@@ -20,6 +22,7 @@ export interface ManualExpenseData {
   participants: string[];
   splitMethod: SplitMethod;
   splits: ExpenseSplit[];
+  items?: ExpenseItem[];
 }
 
 interface Props {
@@ -54,6 +57,18 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
     }
     return [];
   });
+
+  const allIds = members.map((m) => m._id);
+  const [lineItems, setLineItems] = useState<{ name: string; amount: string; assignedParticipants: string[] }[]>(
+    () =>
+      initialData?.items?.map((item) => ({
+        name: item.name,
+        amount: String(item.amount),
+        assignedParticipants: item.assignedParticipants,
+      })) ?? []
+  );
+  const [fees, setFees] = useState("");
+
   const [error, setError] = useState("");
 
   const totalAmount = parseFloat(amount) || 0;
@@ -113,28 +128,63 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
       return { splits: computePercentageSplits(totalAmount, entries), error: "" };
     }
 
+    if (splitMethod === "itemized") {
+      if (lineItems.length === 0) return { splits: [], error: "Add at least one item" };
+      if (lineItems.some((item) => item.assignedParticipants.length === 0))
+        return { splits: [], error: "Every item must have at least one participant" };
+      if (lineItems.some((item) => !parseFloat(item.amount) || parseFloat(item.amount) === 0))
+        return { splits: [], error: "All items must have a valid amount" };
+      const expenseItems: ExpenseItem[] = lineItems.map((item) => ({
+        name: item.name,
+        amount: parseFloat(item.amount) || 0,
+        assignedParticipants: item.assignedParticipants,
+      }));
+      const baseSplits = computeItemizedSplits(expenseItems);
+      return { splits: applyProportionalFees(baseSplits, parseFloat(fees) || 0), error: "" };
+    }
+
     return { splits: [], error: "Unknown split method" };
   };
+
+  const itemizedSubtotal = lineItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  const itemizedFees = parseFloat(fees) || 0;
+  const itemizedTotal = Number((itemizedSubtotal + itemizedFees).toFixed(2));
+  const effectiveAmount = splitMethod === "itemized" ? itemizedTotal : totalAmount;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     if (!title.trim()) return setError("Title is required");
-    if (!totalAmount || totalAmount <= 0) return setError("Enter a valid amount");
+    if (splitMethod !== "itemized" && (!totalAmount || totalAmount <= 0)) return setError("Enter a valid amount");
     if (!paidBy) return setError("Select who paid");
-    if (activeMembers.length === 0) return setError("Select at least one participant");
+    if (splitMethod !== "itemized" && activeMembers.length === 0) return setError("Select at least one participant");
 
     const { splits, error: splitError } = resolveSplits();
     if (splitError) return setError(splitError);
 
+    const expenseItems: ExpenseItem[] | undefined =
+      splitMethod === "itemized"
+        ? lineItems.map((item) => ({
+            name: item.name,
+            amount: parseFloat(item.amount) || 0,
+            assignedParticipants: item.assignedParticipants,
+          }))
+        : undefined;
+
+    const allItemParticipants =
+      splitMethod === "itemized"
+        ? [...new Set(lineItems.flatMap((item) => item.assignedParticipants))]
+        : activeMembers.map((m) => m._id);
+
     await onSubmit({
       title: title.trim(),
-      amount: totalAmount,
+      amount: effectiveAmount,
       paidBy,
       date,
-      participants: activeMembers.map((m) => m._id),
+      participants: allItemParticipants,
       splitMethod,
       splits,
+      items: expenseItems,
     });
   };
 
@@ -156,6 +206,7 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
       />
 
       <div className="flex gap-3">
+        {splitMethod !== "itemized" && (
         <input
           className="input flex-1"
           type="number"
@@ -166,6 +217,7 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
         />
+        )}
         <input
           className="input flex-1"
           type="date"
@@ -184,32 +236,34 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
       </select>
 
       {/* Participants */}
-      <div className="rounded-xl bg-slate-50 p-3">
-        <p className="mb-2 text-sm font-medium text-slate-700">Participants</p>
-        <div className="flex flex-wrap gap-2">
-          {members.map((m) => {
-            const active = participants.includes(m._id);
-            return (
-              <button
-                key={m._id}
-                type="button"
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  active ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600"
-                }`}
-                onClick={() => toggleParticipant(m._id)}
-              >
-                {m.name}
-              </button>
-            );
-          })}
+      {splitMethod !== "itemized" && (
+        <div className="rounded-xl bg-slate-50 p-3">
+          <p className="mb-2 text-sm font-medium text-slate-700">Participants</p>
+          <div className="flex flex-wrap gap-2">
+            {members.map((m) => {
+              const active = participants.includes(m._id);
+              return (
+                <button
+                  key={m._id}
+                  type="button"
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                    active ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600"
+                  }`}
+                  onClick={() => toggleParticipant(m._id)}
+                >
+                  {m.name}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Split method */}
       <div className="rounded-xl bg-slate-50 p-3">
         <p className="mb-2 text-sm font-medium text-slate-700">Split Method</p>
         <div className="flex gap-2">
-          {(["equal", "exact", "percentage"] as SplitMethod[]).map((method) => (
+          {(["equal", "exact", "percentage", "itemized"] as SplitMethod[]).map((method) => (
             <button
               key={method}
               type="button"
@@ -223,7 +277,7 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
                 setSplitEntries([]);
               }}
             >
-              {method === "equal" ? "Equal" : method === "exact" ? "Exact Amount" : "Percentage"}
+              {method === "equal" ? "Equal" : method === "exact" ? "Exact" : method === "percentage" ? "%" : "Itemized"}
             </button>
           ))}
         </div>
@@ -304,6 +358,125 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
             Total: {percentSum.toFixed(1)}%
             {Math.abs(percentSum - 100) < 0.1 ? " ✓" : " (must equal 100%)"}
           </p>
+        </div>
+      )}
+
+      {/* Itemized items */}
+      {splitMethod === "itemized" && (
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-slate-700">Items</p>
+          {lineItems.map((item, index) => (
+            <div key={index} className="space-y-2 rounded-xl border border-slate-200 p-3">
+              <div className="flex gap-2">
+                <input
+                  className="input flex-1"
+                  value={item.name}
+                  onChange={(e) =>
+                    setLineItems((current) =>
+                      current.map((li, i) => (i === index ? { ...li, name: e.target.value } : li))
+                    )
+                  }
+                  placeholder="Item name"
+                />
+                <input
+                  className="input w-28"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={item.amount}
+                  onChange={(e) =>
+                    setLineItems((current) =>
+                      current.map((li, i) => (i === index ? { ...li, amount: e.target.value } : li))
+                    )
+                  }
+                  placeholder="$0.00"
+                />
+                <button
+                  type="button"
+                  className="text-slate-400 hover:text-rose-500 transition-colors px-1"
+                  onClick={() => setLineItems((current) => current.filter((_, i) => i !== index))}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {members.map((m) => {
+                  const assigned = item.assignedParticipants.includes(m._id);
+                  return (
+                    <button
+                      key={m._id}
+                      type="button"
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                        assigned ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
+                      }`}
+                      onClick={() =>
+                        setLineItems((current) =>
+                          current.map((li, i) => {
+                            if (i !== index) return li;
+                            const assignedParticipants = li.assignedParticipants.includes(m._id)
+                              ? li.assignedParticipants.filter((id) => id !== m._id)
+                              : [...li.assignedParticipants, m._id];
+                            return { ...li, assignedParticipants };
+                          })
+                        )
+                      }
+                    >
+                      {m.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="button-secondary w-full py-2 text-sm"
+            onClick={() =>
+              setLineItems((current) => [
+                ...current,
+                { name: "", amount: "", assignedParticipants: [...allIds] },
+              ])
+            }
+          >
+            + Add Item
+          </button>
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
+            <span className="flex-1 text-sm text-slate-600">Tax &amp; Fees (split proportionally)</span>
+            <input
+              className="input w-28 text-right"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="$0.00"
+              value={fees}
+              onChange={(e) => setFees(e.target.value)}
+            />
+          </div>
+
+          {lineItems.length > 0 && itemizedSubtotal > 0 && (
+            <div className="rounded-xl bg-emerald-50 p-3">
+              <p className="mb-2 text-xs font-medium text-emerald-700">
+                Computed splits (total: {formatCurrency(itemizedTotal)}):
+              </p>
+              {applyProportionalFees(
+                computeItemizedSplits(
+                  lineItems
+                    .filter((item) => parseFloat(item.amount) > 0 && item.assignedParticipants.length > 0)
+                    .map((item) => ({
+                      name: item.name,
+                      amount: parseFloat(item.amount) || 0,
+                      assignedParticipants: item.assignedParticipants,
+                    }))
+                ),
+                itemizedFees
+              ).map((split) => (
+                <div key={split.participantId} className="flex justify-between text-sm text-emerald-900">
+                  <span>{nameFor(split.participantId)}</span>
+                  <span className="font-medium">{formatCurrency(split.owedAmount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

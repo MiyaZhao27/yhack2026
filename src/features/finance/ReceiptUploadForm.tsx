@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 
 import { ReceiptUpload } from "../../components/ReceiptUpload";
-import { computeItemizedSplits } from "../../lib/finance/calculations";
+import { applyProportionalFees, computeItemizedSplits } from "../../lib/finance/calculations";
 import { NormalizedReceipt } from "../../lib/ocr/normalizeReceipt";
 import { formatCurrency } from "../../lib/ui/format";
 import { ExpenseItem, ExpenseSplit, Member } from "../../types";
@@ -41,6 +41,7 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
   const [paidBy, setPaidBy] = useState(members[0]?._id || "");
   const [date, setDate] = useState(today);
   const [items, setItems] = useState<EditableItem[]>([]);
+  const [fees, setFees] = useState("");
   const [error, setError] = useState("");
   const [titleTouched, setTitleTouched] = useState(false);
   const [dateTouched, setDateTouched] = useState(false);
@@ -58,7 +59,17 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
       setDate(receipt.purchaseDate);
     }
 
-    if (items.length === 0 && receipt.total) {
+    setFees(receipt.fees ? String(receipt.fees) : "");
+
+    if (receipt.items && receipt.items.length > 0) {
+      setItems(
+        receipt.items.map((item) => ({
+          name: item.name,
+          amount: String(item.amount),
+          assignedParticipants: [...allIds],
+        }))
+      );
+    } else if (receipt.total) {
       setItems([
         {
           name: receipt.merchantName ? `${receipt.merchantName} total` : "Receipt total",
@@ -66,6 +77,8 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
           assignedParticipants: [...allIds],
         },
       ]);
+    } else {
+      setItems([]);
     }
 
     setStep("review");
@@ -97,7 +110,8 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
     assignedParticipants: item.assignedParticipants,
   }));
 
-  const computedSplits = computeItemizedSplits(expenseItems);
+  const feesAmount = Number.parseFloat(fees) || 0;
+  const computedSplits = applyProportionalFees(computeItemizedSplits(expenseItems), feesAmount);
   const nameFor = (id: string) => members.find((member) => member._id === id)?.name ?? "?";
 
   const handleSubmit = async (event: FormEvent) => {
@@ -108,7 +122,7 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
       return setError("Every item must have at least one participant assigned.");
     }
 
-    if (items.some((item) => !Number.parseFloat(item.amount) || Number.parseFloat(item.amount) <= 0)) {
+    if (items.some((item) => !Number.parseFloat(item.amount) || Number.parseFloat(item.amount) === 0)) {
       return setError("All items must have a valid amount.");
     }
 
@@ -116,7 +130,7 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
 
     await onSubmit({
       title: title.trim() || ocrMeta?.merchantName || "Receipt purchase",
-      amount: totalAmount,
+      amount: Number((totalAmount + feesAmount).toFixed(2)),
       paidBy,
       date,
       participants: allParticipants,
@@ -195,7 +209,6 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
               <input
                 className="input w-28"
                 type="number"
-                min="0.01"
                 step="0.01"
                 value={item.amount}
                 onChange={(event) => updateItem(index, "amount", event.target.value)}
@@ -236,10 +249,23 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
         </button>
       </div>
 
+      <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
+        <span className="flex-1 text-sm text-slate-600">Tax &amp; Fees (split proportionally)</span>
+        <input
+          className="input w-28 text-right"
+          type="number"
+          min="0"
+          step="0.01"
+          placeholder="$0.00"
+          value={fees}
+          onChange={(e) => setFees(e.target.value)}
+        />
+      </div>
+
       {computedSplits.length > 0 ? (
         <div className="rounded-xl bg-emerald-50 p-3">
           <p className="mb-2 text-xs font-medium text-emerald-700">
-            Computed splits (total: {formatCurrency(totalAmount)}):
+            Computed splits (total: {formatCurrency(totalAmount + feesAmount)}):
           </p>
           {computedSplits.map((split) => (
             <div key={split.participantId} className="flex justify-between text-sm text-emerald-900">

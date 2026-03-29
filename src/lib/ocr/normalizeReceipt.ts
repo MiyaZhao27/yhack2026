@@ -1,11 +1,17 @@
 import { OCRSpaceResponse } from "./ocrSpace";
 
+export interface ReceiptLineItem {
+  name: string;
+  amount: number;
+}
+
 export interface NormalizedReceipt {
   merchantName?: string;
   purchaseDate?: string;
   total?: number;
   subtotal?: number;
-  tax?: number;
+  fees?: number;
+  items?: ReceiptLineItem[];
   rawText?: string;
 }
 
@@ -89,6 +95,52 @@ function findLabeledAmount(lines: string[], pattern: RegExp) {
   return undefined;
 }
 
+const FEE_KEYWORD_RE =
+  /\b(tax|sales tax|hst|gst|vat|tip|gratuity|service fee|service charge|surcharge|delivery fee)\b/i;
+
+// Matches a standalone percentage rate line like "7.5000 %" or "8.875%"
+const PERCENTAGE_LINE_RE = /^\d+\.?\d*\s*%$/;
+
+const ITEM_SKIP_RE =
+  /\b(total|subtotal|grand total|amount due|balance due|change|cash|visa|mastercard|receipt|invoice|date|discount|savings|tax|sales tax|hst|gst|vat|tip|gratuity|service fee|service charge|surcharge|delivery fee)\b/i;
+
+function findLineItems(lines: string[]): ReceiptLineItem[] {
+  const items: ReceiptLineItem[] = [];
+
+  for (const line of lines) {
+    if (ITEM_SKIP_RE.test(line)) continue;
+
+    const amount = extractMoneyFromLine(line);
+    if (amount === undefined || amount <= 0) continue;
+
+    // Strip the trailing price from the line to get the item name
+    const name = line
+      .replace(/\$?\s?\d{1,4}(?:[.,]\d{3})*(?:[.,]\d{2})\s*$/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!name || name.length < 2) continue;
+    // Skip lines that are only digits/punctuation after stripping
+    if (/^[\d\s.,$/-]+$/.test(name)) continue;
+    // Skip lines where the name is just a percentage rate (e.g. "7.5000 %")
+    if (PERCENTAGE_LINE_RE.test(name)) continue;
+
+    items.push({ name, amount });
+  }
+
+  return items;
+}
+
+function findFees(lines: string[]): number | undefined {
+  let total = 0;
+  for (const line of lines) {
+    if (!FEE_KEYWORD_RE.test(line)) continue;
+    const amount = extractMoneyFromLine(line);
+    if (amount !== undefined && amount > 0) total += amount;
+  }
+  return total > 0 ? Number(total.toFixed(2)) : undefined;
+}
+
 function findLargestAmount(lines: string[]) {
   const amounts = lines
     .map((line) => extractMoneyFromLine(line))
@@ -106,6 +158,8 @@ export function normalizeReceipt(payload: OCRSpaceResponse): NormalizedReceipt {
     throw new Error("No readable text was returned from OCR.");
   }
 
+  const items = findLineItems(lines);
+
   return {
     merchantName: findMerchant(lines),
     purchaseDate: findDate(lines),
@@ -113,7 +167,8 @@ export function normalizeReceipt(payload: OCRSpaceResponse): NormalizedReceipt {
       findLabeledAmount(lines, /\b(?:total|amount due|grand total|balance due)\b/i) ||
       findLargestAmount(lines),
     subtotal: findLabeledAmount(lines, /\bsubtotal\b/i),
-    tax: findLabeledAmount(lines, /\b(?:tax|sales tax)\b/i),
+    fees: findFees(lines),
+    items: items.length > 0 ? items : undefined,
     rawText,
   };
 }
