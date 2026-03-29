@@ -14,18 +14,18 @@ export function StatCard({
   icon?: ReactNode;
 }) {
   const toneClass = {
-    sky: "bg-sky-100 text-sky-800",
-    mint: "bg-emerald-100 text-emerald-800",
-    gold: "bg-amber-100 text-amber-800",
-    coral: "bg-rose-100 text-rose-800",
+    sky: "bg-[#d9e2ff] text-[#0c306e]",
+    mint: "bg-[#c8f3de] text-[#00503a]",
+    gold: "bg-[#ffdcbf] text-[#7a4300]",
+    coral: "bg-[#ffd4dc] text-[#8f1d3a]",
   }[tone];
 
   return (
-    <div className="glass-card">
+    <div className="section-card interactive-lift">
       <div className={`pill ${toneClass}`}>{icon || title}</div>
-      <p className="mt-4 text-sm text-slate-500">{title}</p>
-      <p className="mt-2 text-3xl font-semibold text-slate-900">{value}</p>
-      <p className="mt-1 text-sm text-slate-500">{hint}</p>
+      <p className="mt-4 text-sm text-muted">{title}</p>
+      <p className="mt-1 text-3xl font-bold text-[#2a1738]">{value}</p>
+      <p className="mt-1 text-sm text-muted">{hint}</p>
     </div>
   );
 }

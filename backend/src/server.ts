@@ -5,7 +5,7 @@ import { app } from "./app";
 async function start() {
   await connectDatabase();
   app.listen(env.port, () => {
-    console.log(`LiveWell API listening on http://localhost:${env.port}`);
+    console.log(`SuiteEase API listening on http://localhost:${env.port}`);
   });
 }
 

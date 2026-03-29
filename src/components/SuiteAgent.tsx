@@ -1,19 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, X, Send, Sparkles } from "lucide-react";
+import { MessageCircle, Send, Sparkles, X } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
-export function SuiteAgent() {
-  const [open, setOpen] = useState(false);
+interface SuiteAgentProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showLauncher?: boolean;
+}
+
+export function SuiteAgent({ open: controlledOpen, onOpenChange, showLauncher = true }: SuiteAgentProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hey! I'm your suite assistant. Ask me anything — spending habits, who owes who, upcoming tasks, or any patterns you're curious about.",
+      content:
+        "Hey, I’m your suite assistant. Ask me about balances, chores, trends, or anything happening in your suite.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -23,7 +33,7 @@ export function SuiteAgent() {
 
   useEffect(() => {
     if (open) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setTimeout(() => inputRef.current?.focus(), 110);
     }
   }, [open]);
 
@@ -36,9 +46,9 @@ export function SuiteAgent() {
     if (!text || loading) return;
 
     const userMsg: Message = { role: "user", content: text };
-    const history = messages.filter((m) => m.role !== "assistant" || messages.indexOf(m) > 0);
+    const history = messages.filter((message, index) => message.role !== "assistant" || index > 0);
 
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((previous) => [...previous, userMsg]);
     setInput("");
     setLoading(true);
 
@@ -49,14 +59,14 @@ export function SuiteAgent() {
         body: JSON.stringify({ message: text, history }),
       });
       const data = (await res.json()) as { reply?: string; error?: string };
-      setMessages((prev) => [
-        ...prev,
+      setMessages((previous) => [
+        ...previous,
         { role: "assistant", content: data.reply ?? data.error ?? "Something went wrong." },
       ]);
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Connection error. Please try again." },
+      setMessages((previous) => [
+        ...previous,
+        { role: "assistant", content: "Connection issue. Please try again." },
       ]);
     } finally {
       setLoading(false);
@@ -65,114 +75,109 @@ export function SuiteAgent() {
 
   return (
     <>
-      {/* Chat panel */}
-      {open && (
-        <div className="fixed bottom-24 right-5 z-50 flex w-[340px] flex-col rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 sm:right-8"
-          style={{ height: "480px" }}
+      {open ? (
+        <div
+          className="fixed bottom-24 right-4 z-50 flex h-[500px] w-[min(94vw,380px)] flex-col overflow-hidden rounded-[1.6rem] border border-[rgba(108,73,118,0.22)] bg-[rgba(255,251,255,0.95)] shadow-[0_34px_72px_-34px_rgba(30,16,45,0.8)] backdrop-blur-md sm:right-6"
+          style={{ animation: "riseIn 220ms cubic-bezier(0.2,0.7,0.2,1)" }}
         >
-          {/* Header */}
-          <div
-            className="flex items-center gap-3 rounded-t-3xl px-4 py-3"
-            style={{ background: "linear-gradient(135deg, #6b002e 0%, #280e3f 100%)" }}
-          >
+          <div className="flex items-center gap-3 border-b border-[rgba(108,73,118,0.16)] bg-gradient-to-r from-[#6b002e] to-[#8b1d44] px-4 py-3 text-white">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
-              <Sparkles size={16} className="text-white" />
+              <Sparkles size={15} />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold text-white">Suite Assistant</p>
-              <p className="text-xs text-white/60">Powered by Lava AI</p>
+              <p className="text-sm font-semibold">Suite Assistant</p>
+              <p className="text-[11px] text-white/70">Lava AI insights</p>
             </div>
             <button
+              type="button"
               onClick={() => setOpen(false)}
-              className="text-white/60 hover:text-white transition-colors"
+              className="rounded-lg p-1 text-white/70 hover:bg-white/15 hover:text-white"
+              aria-label="Close suite assistant"
             >
-              <X size={18} />
+              <X size={17} />
             </button>
           </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-            {messages.map((msg, i) => (
+          <div className="no-scrollbar flex-1 space-y-3 overflow-y-auto px-4 py-3">
+            {messages.map((message, index) => (
               <div
-                key={i}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                key={index}
+                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                {msg.role === "assistant" && (
-                  <div className="mr-2 mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#6b002e] to-[#280e3f]">
-                    <Sparkles size={11} className="text-white" />
+                {message.role === "assistant" ? (
+                  <div className="mr-2 mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#6b002e] to-[#8b1d44] text-white">
+                    <Sparkles size={10} />
                   </div>
-                )}
+                ) : null}
                 <div
-                  className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
-                    msg.role === "user"
-                      ? "bg-slate-900 text-white rounded-br-sm"
-                      : "bg-slate-100 text-slate-800 rounded-bl-sm"
+                  className={`max-w-[78%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${
+                    message.role === "user"
+                      ? "rounded-br-sm bg-[#2a1738] text-white"
+                      : "rounded-bl-sm bg-[#f6eef9] text-[#33243f]"
                   }`}
                 >
-                  {msg.content}
+                  {message.content}
                 </div>
               </div>
             ))}
 
-            {loading && (
+            {loading ? (
               <div className="flex justify-start">
-                <div className="mr-2 mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#6b002e] to-[#280e3f]">
-                  <Sparkles size={11} className="text-white" />
+                <div className="mr-2 mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#6b002e] to-[#8b1d44] text-white">
+                  <Sparkles size={10} />
                 </div>
-                <div className="rounded-2xl rounded-bl-sm bg-slate-100 px-4 py-3">
+                <div className="rounded-2xl rounded-bl-sm bg-[#f6eef9] px-4 py-3">
                   <div className="flex gap-1">
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: "0ms" }} />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: "150ms" }} />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: "300ms" }} />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9f8aa9]" style={{ animationDelay: "0ms" }} />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9f8aa9]" style={{ animationDelay: "120ms" }} />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#9f8aa9]" style={{ animationDelay: "240ms" }} />
                   </div>
                 </div>
               </div>
-            )}
+            ) : null}
+
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
-          <div className="border-t border-slate-100 px-3 py-3">
-            <div className="flex items-center gap-2 rounded-2xl bg-slate-100 px-3 py-2">
+          <div className="border-t border-[rgba(108,73,118,0.16)] px-3 pb-3 pt-2.5">
+            <div className="flex items-center gap-2 rounded-2xl border border-[rgba(108,73,118,0.2)] bg-white px-2.5 py-2">
               <input
                 ref={inputRef}
-                className="flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 outline-none"
-                placeholder="Ask about your suite…"
+                className="flex-1 bg-transparent text-sm text-[#2a1738] placeholder:text-[#9b89a2] outline-none"
+                placeholder="Ask about your suite..."
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
                     void send();
                   }
                 }}
               />
               <button
+                type="button"
                 onClick={() => void send()}
                 disabled={!input.trim() || loading}
-                className="flex h-7 w-7 items-center justify-center rounded-xl transition-colors disabled:opacity-30"
-                style={{ background: "linear-gradient(135deg, #6b002e 0%, #280e3f 100%)" }}
+                className="button-primary h-8 min-w-8 rounded-xl px-2.5 py-0"
+                aria-label="Send message"
               >
-                <Send size={13} className="text-white" />
+                <Send size={13} />
               </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Floating button */}
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-6 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105 active:scale-95 sm:right-8"
-        style={{ background: "linear-gradient(135deg, #6b002e 0%, #280e3f 100%)" }}
-        aria-label="Open suite assistant"
-      >
-        {open ? (
-          <X size={22} className="text-white" />
-        ) : (
-          <MessageCircle size={22} className="text-white" />
-        )}
-      </button>
+      {showLauncher ? (
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="floating-chat-anchor fixed bottom-6 right-6 z-50"
+          aria-label={open ? "Close suite assistant" : "Open suite assistant"}
+        >
+          {open ? <X size={20} /> : <MessageCircle size={20} />}
+        </button>
+      ) : null}
     </>
   );
 }

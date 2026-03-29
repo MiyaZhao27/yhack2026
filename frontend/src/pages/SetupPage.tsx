@@ -52,7 +52,7 @@ export function SetupPage() {
       <SectionCard title="Demo Mode" subtitle="Seeded to impress right after setup">
         <div className="space-y-4 text-sm text-slate-600">
           <p>
-            LiveWell is seeded with <span className="font-semibold text-slate-900">Maple 4B</span> and four members so
+            SuiteEase is seeded with <span className="font-semibold text-slate-900">Maple 4B</span> and four members so
             the dashboard, chores, shopping, and balances all look alive right away.
           </p>
           <div className="rounded-2xl bg-slate-900 p-5 text-white">

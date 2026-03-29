@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, Pencil, Plus, ReceiptText, Trash2, Wallet } from "lucide-react";
 import { useSession } from "next-auth/react";
 
 import { api } from "../lib/api/client";
@@ -16,24 +16,25 @@ import { Balance, Expense, Settlement } from "../types";
 
 type SettleUp = { from: string; fromId?: string; to: string; toId?: string; amount: number };
 
+type ExpenseMode = "manual" | "receipt";
+
 export function FinancePage() {
   const { suite, members } = useSuite();
   const { data: session, status } = useSession();
   const currentUserId = session?.user?.id ?? "";
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [settleUps, setSettleUps] = useState<SettleUp[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
-  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [addExpenseMode, setAddExpenseMode] = useState<ExpenseMode | null>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [paymentPrefill, setPaymentPrefill] = useState<
     { payerId?: string; receiverId?: string; amount?: number } | undefined
   >();
-  const [expandedExpenses, setExpandedExpenses] = useState<Set<string>>(new Set());
-  const [expandedSettlements, setExpandedSettlements] = useState<Set<string>>(new Set());
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [filterPeriod, setFilterPeriod] = useState<"all" | "week" | "month">("all");
-  const [filterUser, setFilterUser] = useState("");
+  const [historyView, setHistoryView] = useState<"expenses" | "settlements">("expenses");
+  const [expandedExpenses, setExpandedExpenses] = useState<Record<string, boolean>>({});
 
   const loadAll = async () => {
     if (!suite?._id || status !== "authenticated") return;
@@ -59,59 +60,25 @@ export function FinancePage() {
     void loadAll();
   }, [suite?._id, status]);
 
-  // For each expense: Map<expenseId, Map<debtorId, settledAmount>>
-  const splitAllocations = useMemo(() => {
-    const map = new Map<string, Map<string, number>>();
-    for (const s of settlements) {
-      for (const alloc of s.allocations ?? []) {
-        const expId = alloc.expenseId;
-        if (!map.has(expId)) map.set(expId, new Map());
-        map.get(expId)!.set(
-          alloc.debtorId,
-          (map.get(expId)!.get(alloc.debtorId) ?? 0) + alloc.amount
-        );
-      }
-    }
-    return map;
-  }, [settlements]);
+  const nameFor = (id: string) => members.find((member) => member._id === id)?.name ?? "Unknown";
 
-  const nameFor = (id: string) => members.find((m) => m._id === id)?.name ?? "Unknown";
+  const sortedExpenses = useMemo(
+    () => [...expenses].sort((a, b) => new Date(b.date ?? b.createdAt).getTime() - new Date(a.date ?? a.createdAt).getTime()),
+    [expenses]
+  );
 
-  const toggleExpense = (id: string) =>
-    setExpandedExpenses((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  const sortedSettlements = useMemo(
+    () => [...settlements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [settlements]
+  );
 
-  const toggleSettlement = (id: string) =>
-    setExpandedSettlements((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  const myBalance = balances.find((balance) => balance.userId === currentUserId);
+  const myNet = myBalance?.outstandingNet ?? 0;
+  const myOwes = myNet < 0 ? -myNet : 0;
+  const myOwed = myNet > 0 ? myNet : 0;
 
-  const filteredExpenses = useMemo(() => {
-    return expenses.filter((e) => {
-      if (filterPeriod !== "all") {
-        const expDate = new Date(e.date ?? e.createdAt);
-        const now = new Date();
-        if (filterPeriod === "week") {
-          const weekAgo = new Date(now);
-          weekAgo.setDate(weekAgo.getDate() - 7);
-          if (expDate < weekAgo) return false;
-        } else if (filterPeriod === "month") {
-          const monthAgo = new Date(now);
-          monthAgo.setMonth(monthAgo.getMonth() - 1);
-          if (expDate < monthAgo) return false;
-        }
-      }
-      if (filterUser) {
-        if (!e.participants.includes(filterUser) && e.paidBy !== filterUser) return false;
-      }
-      return true;
-    });
-  }, [expenses, filterPeriod, filterUser]);
+  const iOwe = settleUps.filter((item) => item.fromId === currentUserId);
+  const owedToMe = settleUps.filter((item) => item.toId === currentUserId);
 
   const handleDeleteExpense = async (id: string) => {
     await api.delete(`/expenses/${id}`);
@@ -128,9 +95,23 @@ export function FinancePage() {
     setShowPayment(true);
   };
 
+  const toggleExpenseDetails = (expenseId: string) => {
+    setExpandedExpenses((current) => ({
+      ...current,
+      [expenseId]: !current[expenseId],
+    }));
+  };
+
+  const splitMethodLabel: Record<Expense["splitMethod"], string> = {
+    equal: "Equal split",
+    exact: "Exact amounts",
+    percentage: "Percentage split",
+    itemized: "Itemized split",
+  };
+
   return (
     <>
-      {editingExpense && (
+      {editingExpense ? (
         <EditExpenseModal
           expense={editingExpense}
           members={members}
@@ -140,19 +121,22 @@ export function FinancePage() {
           }}
           onClose={() => setEditingExpense(null)}
         />
-      )}
-      {showAddExpense && suite && (
+      ) : null}
+
+      {addExpenseMode && suite ? (
         <AddExpenseModal
           members={members}
           suiteId={suite._id}
+          initialTab={addExpenseMode}
           onSuccess={() => {
-            setShowAddExpense(false);
+            setAddExpenseMode(null);
             void loadAll();
           }}
-          onClose={() => setShowAddExpense(false)}
+          onClose={() => setAddExpenseMode(null)}
         />
-      )}
-      {showPayment && suite && (
+      ) : null}
+
+      {showPayment && suite ? (
         <RecordPaymentModal
           members={members}
           suiteId={suite._id}
@@ -164,473 +148,263 @@ export function FinancePage() {
           }}
           onClose={() => setShowPayment(false)}
         />
-      )}
+      ) : null}
 
-      <div className="space-y-6">
-        <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-
-          {/* Left column: Balances + Settle Up */}
-          <div className="space-y-6">
-
-            {/* Balances */}
-            <SectionCard title="Balances" subtitle="Current outstanding after settlements">
-              <div className="space-y-3">
-                {balances.map((b) => {
-                  // outstandingNet > 0: net creditor (others owe you)
-                  // outstandingNet < 0: net debtor (you owe others)
-                  // outstanding: total you still owe others
-                  // outstanding + outstandingNet: total others still owe you
-                  const amountOwedToYou = Number((b.outstanding + b.outstandingNet).toFixed(2));
-                  const isOwed = b.outstandingNet > 0.005;
-                  const isOwing = b.outstandingNet < -0.005;
-                  return (
-                    <div key={b.userId} className="rounded-2xl bg-slate-50 p-4">
-                      <div className="flex items-center justify-between">
-                        <p className="font-semibold text-slate-900">{b.name}</p>
-                        <span
-                          className={`pill ${
-                            isOwed
-                              ? "bg-emerald-100 text-emerald-800"
-                              : isOwing
-                                ? "bg-rose-100 text-rose-700"
-                                : "bg-slate-100 text-slate-500"
-                          }`}
-                        >
-                          {isOwed
-                            ? `Owed ${formatCurrency(b.outstandingNet)}`
-                            : isOwing
-                              ? `Owes ${formatCurrency(-b.outstandingNet)}`
-                              : "Settled up"}
-                        </span>
-                      </div>
-                      {(amountOwedToYou > 0.005 || b.outstanding > 0.005) && (
-                        <p className="mt-1 text-xs text-slate-500">
-                          {amountOwedToYou > 0.005
-                            ? `Others owe ${formatCurrency(amountOwedToYou)}`
-                            : ""}
-                          {amountOwedToYou > 0.005 && b.outstanding > 0.005 ? " · " : ""}
-                          {b.outstanding > 0.005
-                            ? `Owes others ${formatCurrency(b.outstanding)}`
-                            : ""}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-                {!balances.length && <EmptyState label="No members yet." />}
-              </div>
-            </SectionCard>
-
-            {/* Settle Up */}
-            <SectionCard
-              title="Settle Up"
-              subtitle="Suggested payments to clear balances"
-              action={
-                <button
-                  className="button-primary flex items-center gap-1 text-sm"
-                  onClick={() => openPayment()}
-                >
-                  <Plus size={15} /> Record Payment
-                </button>
-              }
+      <SectionCard
+        title="Finance"
+        action={
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+            <button
+              className="button-secondary w-full px-3 py-2 text-xs sm:w-auto"
+              onClick={() => setAddExpenseMode("manual")}
             >
-              <div className="space-y-3">
-                {settleUps.map((s, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between rounded-2xl bg-emerald-50 p-4"
-                  >
-                    <p className="text-sm text-emerald-900">
-                      <span className="font-semibold">{s.from}</span> pays{" "}
-                      <span className="font-semibold">{s.to}</span>
-                      <span className="ml-2 font-semibold">{formatCurrency(s.amount)}</span>
-                    </p>
-                    <button
-                      className="button-secondary text-xs"
-                      onClick={() =>
-                        openPayment({ payerId: s.fromId, receiverId: s.toId, amount: s.amount })
-                      }
-                    >
-                      Record
-                    </button>
+              <Plus size={14} /> Manual Expense
+            </button>
+            <button
+              className="button-secondary w-full px-3 py-2 text-xs sm:w-auto"
+              onClick={() => setAddExpenseMode("receipt")}
+            >
+              <ReceiptText size={14} /> Receipt Expense
+            </button>
+            <button
+              className="button-primary col-span-2 w-full px-3 py-2 text-xs sm:col-auto sm:w-auto"
+              onClick={() => openPayment()}
+            >
+              <Wallet size={14} /> Record Payment
+            </button>
+          </div>
+        }
+      >
+        <div className="grid gap-4 lg:grid-cols-[0.88fr_1.12fr]">
+          <div className="space-y-3">
+            <div className="surface-soft rounded-2xl px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Your Balance</p>
+              <p
+                className={`mt-2 text-3xl font-bold ${
+                  myNet > 0.005 ? "text-[#00503a]" : myNet < -0.005 ? "text-[#8f1d3a]" : "text-[#2a1738]"
+                }`}
+              >
+                {myNet > 0.005
+                  ? `+${formatCurrency(myNet)}`
+                  : myNet < -0.005
+                    ? `-${formatCurrency(-myNet)}`
+                    : formatCurrency(0)}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {myNet > 0.005
+                  ? `You are owed ${formatCurrency(myOwed)}`
+                  : myNet < -0.005
+                    ? `You owe ${formatCurrency(myOwes)}`
+                    : "You are settled up"}
+              </p>
+            </div>
+
+            <div className="surface-soft rounded-2xl px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Settle Up</p>
+
+              <div className="mt-3 space-y-3">
+                <div>
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#8f1d3a]">You Owe</p>
+                  <div className="space-y-1.5">
+                    {iOwe.map((item, index) => (
+                      <button
+                        key={`${item.fromId}-${item.toId}-${index}`}
+                        className="flex w-full items-center justify-between rounded-xl bg-[#ffe0ea] px-3 py-2 text-left text-sm text-[#8f1d3a]"
+                        onClick={() => openPayment({ payerId: item.fromId, receiverId: item.toId, amount: item.amount })}
+                      >
+                        <span>Pay {item.to}</span>
+                        <span className="font-semibold">{formatCurrency(item.amount)}</span>
+                      </button>
+                    ))}
+                    {!iOwe.length ? <p className="text-sm text-muted">Nothing to pay.</p> : null}
                   </div>
-                ))}
-                {!settleUps.length && <EmptyState label="All settled up!" />}
-                <p className="text-xs text-slate-400">
-                  Suggestions from direct payer-to-payee obligations · Payments applied FIFO to oldest obligations
-                </p>
+                </div>
+
+                <div>
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#00503a]">Owed To You</p>
+                  <div className="space-y-1.5">
+                    {owedToMe.map((item, index) => (
+                      <div
+                        key={`${item.toId}-${item.fromId}-${index}`}
+                        className="flex items-center justify-between rounded-xl bg-[#e2f7eb] px-3 py-2 text-sm text-[#00503a]"
+                      >
+                        <span>{item.from} owes you</span>
+                        <span className="font-semibold">{formatCurrency(item.amount)}</span>
+                      </div>
+                    ))}
+                    {!owedToMe.length ? <p className="text-sm text-muted">No incoming payments.</p> : null}
+                  </div>
+                </div>
               </div>
-            </SectionCard>
+            </div>
           </div>
 
-          {/* Right column: Expense History */}
-          <SectionCard
-            title="Expense History"
-            subtitle="Most recent first"
-            action={
-              <button
-                className="button-primary flex items-center gap-1 text-sm"
-                onClick={() => setShowAddExpense(true)}
-              >
-                <Plus size={15} /> Add
-              </button>
-            }
-          >
-            {/* Filter bar */}
-            <div className="mb-4 flex flex-wrap gap-2">
-              <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
-                {(["all", "week", "month"] as const).map((p) => (
-                  <button
-                    key={p}
-                    className={`rounded-lg px-3 py-1 text-xs font-medium transition ${
-                      filterPeriod === p ? "bg-white shadow-sm text-slate-900" : "text-slate-500"
-                    }`}
-                    onClick={() => setFilterPeriod(p)}
-                  >
-                    {p === "all" ? "All time" : p === "week" ? "This week" : "This month"}
-                  </button>
-                ))}
-              </div>
-              <select
-                className="rounded-xl border-0 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700"
-                value={filterUser}
-                onChange={(e) => setFilterUser(e.target.value)}
-              >
-                <option value="">All members</option>
-                {members.map((m) => (
-                  <option key={m._id} value={m._id}>{m.name}</option>
-                ))}
-              </select>
-              {(filterPeriod !== "all" || filterUser) && (
+          <div className="surface-soft rounded-2xl px-4 py-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">History</p>
+              <div className="segmented">
                 <button
-                  className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800"
-                  onClick={() => { setFilterPeriod("all"); setFilterUser(""); }}
+                  className={historyView === "expenses" ? "segment-button-active" : "segment-button"}
+                  onClick={() => setHistoryView("expenses")}
                 >
-                  Clear
+                  Expenses
                 </button>
-              )}
+                <button
+                  className={historyView === "settlements" ? "segment-button-active" : "segment-button"}
+                  onClick={() => setHistoryView("settlements")}
+                >
+                  Payments
+                </button>
+              </div>
             </div>
-            {(filterPeriod !== "all" || filterUser) && (
-              <p className="mb-3 text-xs text-slate-500">
-                Showing {filteredExpenses.length} of {expenses.length} expenses
-              </p>
-            )}
-            <div className="space-y-3">
-              {filteredExpenses.map((expense) => {
-                const isExpanded = expandedExpenses.has(expense._id);
-                const expAllocMap = splitAllocations.get(expense._id) ?? new Map<string, number>();
 
-                return (
-                  <div key={expense._id} className="rounded-2xl bg-slate-50">
-                    <div
-                      className="flex cursor-pointer items-center gap-3 p-4"
-                      onClick={() => toggleExpense(expense._id)}
-                    >
-                      <span className="text-slate-400">
-                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                      </span>
-                      <div className="flex-1">
-                        <p className="font-semibold text-slate-900">{expense.title}</p>
-                        <p className="text-xs text-slate-500">
-                          Paid by {nameFor(expense.paidBy)} · Added {formatDateTime(expense.createdAt)}
-                        </p>
+            <div className="no-scrollbar max-h-[560px] space-y-2 overflow-y-auto pr-1">
+              {historyView === "expenses"
+                ? sortedExpenses.map((expense) => (
+                    <div key={expense._id} className="rounded-xl bg-white/80 px-3 py-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-[#2a1738]">{expense.title}</p>
+                          <p className="text-xs text-muted">
+                            Paid by {nameFor(expense.paidBy)} · {formatDateTime(expense.date ?? expense.createdAt)}
+                          </p>
+                        </div>
+                        <p className="text-sm font-semibold text-[#2a1738]">{formatCurrency(expense.amount)}</p>
                       </div>
-                      <p className="font-semibold text-slate-900">
-                        {formatCurrency(expense.amount)}
-                      </p>
-                      <button
-                        className="text-slate-400 hover:text-sky-500"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingExpense(expense);
-                        }}
-                      >
-                        <Pencil size={15} />
-                      </button>
-                      <button
-                        className="text-slate-400 hover:text-rose-500"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleDeleteExpense(expense._id);
-                        }}
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                        <span className="rounded-full bg-[rgba(108,73,118,0.12)] px-2 py-0.5 text-[11px] font-semibold text-[#4f3f5a]">
+                          {splitMethodLabel[expense.splitMethod]}
+                        </span>
+                        <button
+                          className="button-ghost px-2 py-1 text-xs"
+                          onClick={() => toggleExpenseDetails(expense._id)}
+                          type="button"
+                        >
+                          {expandedExpenses[expense._id] ? "Hide details" : "Show details"}
+                          <ChevronDown
+                            size={14}
+                            className={`transition-transform ${expandedExpenses[expense._id] ? "rotate-180" : ""}`}
+                          />
+                        </button>
+                      </div>
 
-                    {isExpanded && (
-                      <div className="border-t border-slate-200 px-4 pb-4 pt-3 space-y-3">
-                        {expense.splitMethod === "itemized" && expense.items?.length > 0 && (
-                          <div>
-                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-                              Items
+                      {expandedExpenses[expense._id] ? (
+                        <div className="mt-2.5 space-y-2 rounded-lg bg-[#f7f2fb] p-2.5 text-xs">
+                          <div className="rounded-md bg-white/90 px-2 py-1.5">
+                            <p className="font-semibold uppercase tracking-[0.08em] text-muted">Participants</p>
+                            <p className="mt-1 text-[#2a1738]">
+                              {expense.participants.length
+                                ? expense.participants.map((id) => nameFor(id)).join(", ")
+                                : "No participants"}
                             </p>
-                            <div className="space-y-1">
-                              {expense.items.map((item, i) => (
+                          </div>
+
+                          <div className="rounded-md bg-white/90 px-2 py-1.5">
+                            <p className="font-semibold uppercase tracking-[0.08em] text-muted">Split Breakdown</p>
+                            <div className="mt-1 space-y-1">
+                              {expense.splits.map((split, index) => (
                                 <div
-                                  key={i}
-                                  className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm"
+                                  key={`${split.participantId}-${index}`}
+                                  className="flex items-center justify-between gap-2 text-[#2a1738]"
                                 >
-                                  <div>
-                                    <span className="font-medium text-slate-700">{item.name}</span>
-                                    {item.assignedParticipants?.length > 0 && (
-                                      <span className="ml-2 text-xs text-slate-400">
-                                        {item.assignedParticipants.map((id) => nameFor(id)).join(", ")}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="font-medium text-slate-700">
-                                    {formatCurrency(item.amount)}
+                                  <span>
+                                    {nameFor(split.participantId)}
+                                    {typeof split.percentage === "number"
+                                      ? ` (${split.percentage.toFixed(1)}%)`
+                                      : ""}
                                   </span>
+                                  <span className="font-semibold">{formatCurrency(split.owedAmount)}</span>
                                 </div>
                               ))}
                             </div>
                           </div>
-                        )}
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                          Split breakdown
-                        </p>
-                        <div className="space-y-1.5">
-                          {expense.splits.map((sp) => {
-                            const isPayer = sp.participantId === expense.paidBy;
-                            const settled = expAllocMap.get(sp.participantId) ?? 0;
-                            const remaining = Math.max(0, sp.owedAmount - settled);
-                            const isFullySettled = remaining < 0.005;
 
-                            return (
-                              <div
-                                key={sp.participantId}
-                                className="rounded-lg bg-white px-3 py-2 text-sm"
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="font-medium text-slate-700">
-                                    {nameFor(sp.participantId)}
-                                    {isPayer && (
-                                      <span className="ml-1 text-xs font-normal text-slate-400">
-                                        (payer)
-                                      </span>
-                                    )}
-                                  </span>
-                                  {isPayer ? (
-                                    <span className="text-xs text-slate-400">
-                                      Own share: {formatCurrency(sp.owedAmount)}
-                                    </span>
-                                  ) : (
-                                    <div className="flex items-center gap-3 text-xs">
-                                      <span className="text-slate-500">
-                                        Share:{" "}
-                                        <span className="font-medium text-slate-700">
-                                          {formatCurrency(sp.owedAmount)}
-                                        </span>
-                                      </span>
-                                      <span className="text-emerald-600">
-                                        Settled:{" "}
-                                        <span className="font-medium">
-                                          {formatCurrency(settled)}
-                                        </span>
-                                      </span>
-                                      <span
-                                        className={
-                                          isFullySettled ? "text-slate-400" : "text-rose-600"
-                                        }
-                                      >
-                                        {isFullySettled ? (
-                                          "Paid in full"
-                                        ) : (
-                                          <>
-                                            Remaining:{" "}
-                                            <span className="font-medium">
-                                              {formatCurrency(remaining)}
-                                            </span>
-                                          </>
-                                        )}
-                                      </span>
+                          {expense.splitMethod === "itemized" ? (
+                            <div className="rounded-md bg-white/90 px-2 py-1.5">
+                              <p className="font-semibold uppercase tracking-[0.08em] text-muted">Itemized Details</p>
+                              <div className="mt-1 space-y-1.5">
+                                {expense.items.map((item, index) => (
+                                  <div key={`${item.name}-${index}`} className="rounded-md bg-[#f7f2fb] px-2 py-1">
+                                    <div className="flex items-center justify-between gap-2 text-[#2a1738]">
+                                      <span className="font-medium">{item.name}</span>
+                                      <span className="font-semibold">{formatCurrency(item.amount)}</span>
                                     </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {!filteredExpenses.length && (
-                <EmptyState
-                  label={
-                    expenses.length
-                      ? "No expenses match the current filters."
-                      : "No expenses yet."
-                  }
-                />
-              )}
-            </div>
-          </SectionCard>
-        </div>
+                                    <p className="mt-0.5 text-[11px] text-muted">
+                                      Split with{" "}
+                                      {item.assignedParticipants.length
+                                        ? item.assignedParticipants.map((id) => nameFor(id)).join(", ")
+                                        : "no one"}
+                                    </p>
+                                  </div>
+                                ))}
 
-        {/* Settlement History */}
-        <SectionCard
-          title="Settlement History"
-          subtitle="Recorded direct payments"
-          action={
-            <button
-              className="button-primary flex items-center gap-1 text-sm"
-              onClick={() => openPayment()}
-            >
-              <Plus size={15} /> Record Payment
-            </button>
-          }
-        >
-          <div className="space-y-3">
-            {[...settlements]
-              .sort((a, b) => {
-                const tA = new Date(a.date).getTime();
-                const tB = new Date(b.date).getTime();
-                return tB - tA;
-              })
-              .map((s) => {
-                const isExpanded = expandedSettlements.has(s._id);
-                const isNetting = s.type === "netting";
-
-                const settledAllocs = s.allocations?.filter((a) => a.allocationRole === "settled" || !a.allocationRole) ?? [];
-                const offsetAllocs = s.allocations?.filter((a) => a.allocationRole === "offset") ?? [];
-
-                return (
-                  <div
-                    key={s._id}
-                    className={`rounded-2xl ${isNetting ? "bg-violet-50" : "bg-slate-50"}`}
-                  >
-                    <div
-                      className="flex cursor-pointer items-center gap-3 p-4"
-                      onClick={() => toggleSettlement(s._id)}
-                    >
-                      <span className={isNetting ? "text-violet-400" : "text-slate-400"}>
-                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                      </span>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-slate-900">
-                            {isNetting
-                              ? `${nameFor(s.payerId)} ↔ ${nameFor(s.receiverId)} netted`
-                              : `${nameFor(s.payerId)} paid ${nameFor(s.receiverId)}`}
-                          </p>
-                          {isNetting && (
-                            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
-                              Auto-netted
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500">
-                          {formatDateTime(s.date)}
-                          {!isNetting && s.note ? ` · ${s.note}` : ""}
-                        </p>
-                      </div>
-                      <p className={`font-semibold ${isNetting ? "text-violet-700" : "text-emerald-700"}`}>
-                        {formatCurrency(s.amount)}
-                      </p>
-                      {!isNetting && (
-                        <button
-                          className="text-slate-400 hover:text-rose-500"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void handleDeleteSettlement(s._id);
-                          }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
-                    </div>
-                    {isExpanded && (
-                      <div className="border-t border-slate-200 px-4 pb-4 pt-3 space-y-3">
-                        {isNetting ? (
-                          <>
-                            {settledAllocs.length > 0 && (
-                              <div>
-                                <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-violet-500">
-                                  Cleared obligations ({nameFor(s.payerId)})
-                                </p>
-                                <div className="space-y-1">
-                                  {settledAllocs.map((a, i) => {
-                                    const expense = expenses.find((e) => e._id === a.expenseId);
-                                    return (
-                                      <div
-                                        key={i}
-                                        className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm text-slate-600"
-                                      >
-                                        <span>{expense?.title ?? "Expense"}</span>
-                                        <span className="font-medium text-violet-700">
-                                          {formatCurrency(a.amount)}
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-                            {offsetAllocs.length > 0 && (
-                              <div>
-                                <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-violet-500">
-                                  Offset against ({nameFor(s.receiverId)})
-                                </p>
-                                <div className="space-y-1">
-                                  {offsetAllocs.map((a, i) => {
-                                    const expense = expenses.find((e) => e._id === a.expenseId);
-                                    return (
-                                      <div
-                                        key={i}
-                                        className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm text-slate-600"
-                                      >
-                                        <span>{expense?.title ?? "Expense"}</span>
-                                        <span className="font-medium text-violet-700">
-                                          {formatCurrency(a.amount)}
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-                              Applied to (FIFO)
-                            </p>
-                            {s.allocations?.length ? (
-                              <div className="space-y-1">
-                                {s.allocations.map((a, i) => {
-                                  const expense = expenses.find((e) => e._id === a.expenseId);
+                                {(() => {
+                                  const itemizedSubtotal = expense.items.reduce((sum, item) => sum + item.amount, 0);
+                                  const inferredFees = Number((expense.amount - itemizedSubtotal).toFixed(2));
+                                  const hasFees = inferredFees > 0.009;
                                   return (
-                                    <div
-                                      key={i}
-                                      className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm text-slate-600"
-                                    >
-                                      <span>{expense?.title ?? "Expense"}</span>
-                                      <span className="font-medium text-emerald-700">
-                                        {formatCurrency(a.amount)}
-                                      </span>
+                                    <div className="mt-1 border-t border-[rgba(108,73,118,0.2)] pt-1">
+                                      <div className="flex items-center justify-between text-[#2a1738]">
+                                        <span>Items subtotal</span>
+                                        <span>{formatCurrency(itemizedSubtotal)}</span>
+                                      </div>
+                                      {hasFees ? (
+                                        <div className="flex items-center justify-between text-[#2a1738]">
+                                          <span>Fees &amp; tax</span>
+                                          <span>{formatCurrency(inferredFees)}</span>
+                                        </div>
+                                      ) : null}
+                                      <div className="flex items-center justify-between font-semibold text-[#2a1738]">
+                                        <span>Total</span>
+                                        <span>{formatCurrency(expense.amount)}</span>
+                                      </div>
                                     </div>
                                   );
-                                })}
+                                })()}
                               </div>
-                            ) : (
-                              <p className="text-sm text-slate-400">No allocations recorded.</p>
-                            )}
-                          </>
-                        )}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      <div className="mt-2 flex items-center justify-end gap-1.5">
+                        <button className="button-ghost px-2 py-1" onClick={() => setEditingExpense(expense)}>
+                          <Pencil size={14} />
+                        </button>
+                        <button className="button-ghost px-2 py-1 text-[#8f1d3a]" onClick={() => void handleDeleteExpense(expense._id)}>
+                          <Trash2 size={14} />
+                        </button>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            {!settlements.length && (
-              <EmptyState label="No settlement payments recorded yet." />
-            )}
+                    </div>
+                  ))
+                : sortedSettlements.map((settlement) => (
+                    <div key={settlement._id} className="rounded-xl bg-white/80 px-3 py-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-[#2a1738]">
+                            {nameFor(settlement.payerId)} paid {nameFor(settlement.receiverId)}
+                          </p>
+                          <p className="text-xs text-muted">{formatDateTime(settlement.date)}</p>
+                        </div>
+                        <p className="text-sm font-semibold text-[#00503a]">{formatCurrency(settlement.amount)}</p>
+                      </div>
+                      <div className="mt-2 flex items-center justify-end gap-1.5">
+                        <button className="button-ghost px-2 py-1 text-[#8f1d3a]" onClick={() => void handleDeleteSettlement(settlement._id)}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+              {historyView === "expenses" && !sortedExpenses.length ? (
+                <EmptyState label="No expenses yet." />
+              ) : null}
+              {historyView === "settlements" && !sortedSettlements.length ? (
+                <EmptyState label="No payments recorded yet." />
+              ) : null}
+            </div>
           </div>
-        </SectionCard>
-      </div>
+        </div>
+      </SectionCard>
     </>
   );
 }

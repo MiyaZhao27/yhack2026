@@ -46,17 +46,17 @@ export function EditExpenseModal({ expense, members, onSuccess, onClose }: Props
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-12"
+      className="modal-shell"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
+      <div className="modal-card max-w-lg">
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Edit Expense</h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700">
+          <h2 className="text-lg font-semibold text-[#2a1738]">Edit Expense</h2>
+          <button type="button" onClick={onClose} className="button-ghost p-1">
             <X size={20} />
           </button>
         </div>
-        {error && <p className="mb-4 text-sm text-rose-600">{error}</p>}
+        {error && <p className="mb-4 text-sm text-[#8f1d3a]">{error}</p>}
         <ManualExpenseForm
           members={members}
           initialData={initialData}

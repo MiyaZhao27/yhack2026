@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 
 import { api } from "../lib/api/client";
@@ -13,7 +13,7 @@ import { DashboardData } from "../types";
 export function DashboardPage() {
   const { suite, members } = useSuite();
   const [data, setData] = useState<DashboardData | null>(null);
-  const { status } = useSession();
+  const { data: session, status } = useSession();
 
   useEffect(() => {
     if (!suite?._id || status !== "authenticated") {
@@ -27,56 +27,74 @@ export function DashboardPage() {
       .catch(() => setData(null));
   }, [suite?._id, status]);
 
+  const nameFor = (id: string) => members.find((member) => member._id === id)?.name || "Unknown";
+  const currentUserId = session?.user?.id ?? "";
+  const myOverdue = useMemo(
+    () =>
+      (data?.overdue || []).filter((task) =>
+        currentUserId ? task.assigneeId === currentUserId : true
+      ),
+    [currentUserId, data?.overdue]
+  );
+  const myDueToday = useMemo(
+    () =>
+      (data?.dueToday || []).filter((task) =>
+        currentUserId ? task.assigneeId === currentUserId : true
+      ),
+    [currentUserId, data?.dueToday]
+  );
+  const priorityTasks = useMemo(
+    () => [...myOverdue, ...myDueToday].slice(0, 8),
+    [myDueToday, myOverdue]
+  );
+
+  const overdueCount = myOverdue.length;
+  const dueTodayCount = myDueToday.length;
+
   if (!suite) {
-    return <EmptyState label="Create a suite on Setup to unlock the dashboard." />;
+    return <EmptyState label="Create a suite in Setup to unlock your dashboard." />;
   }
 
-  const nameFor = (id: string) => members.find((member) => member._id === id)?.name || "Unknown";
-
   return (
-    <div className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)] lg:items-start">
-        <div className="relative z-20">
-          <BulletinBoard />
-        </div>
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(290px,1fr)] xl:items-start">
+      <div className="relative z-10">
+        <BulletinBoard />
+      </div>
 
-        <div className="relative z-0">
-          <SectionCard title="Today + Overdue" subtitle="The highest-priority chores across the suite">
-            <div className="space-y-3">
-              {[...(data?.dueToday || []), ...(data?.overdue || [])].slice(0, 6).map((task) => (
-                <div key={task._id} className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+      <div className="space-y-4">
+        <SectionCard title="My Tasks">
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <div className="surface-soft rounded-2xl px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8f1d3a]">Overdue</p>
+              <p className="mt-1 text-xl font-bold text-[#8f1d3a]">{overdueCount}</p>
+            </div>
+            <div className="surface-soft rounded-2xl px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0c306e]">Due Today</p>
+              <p className="mt-1 text-xl font-bold text-[#0c306e]">{dueTodayCount}</p>
+            </div>
+          </div>
+
+          <div className="space-y-2.5">
+            {priorityTasks.map((task) => (
+              <div key={task._id} className="surface-soft interactive-lift rounded-2xl px-3 py-2.5">
+                <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="font-medium text-slate-900">{task.title}</p>
-                    <p className="text-sm text-slate-500">{nameFor(task.assigneeId)}</p>
+                    <p className="text-sm font-semibold text-[#2a1738]">{task.title}</p>
+                    <p className="mt-0.5 text-xs text-muted">{nameFor(task.assigneeId)}</p>
                   </div>
-                  <span
-                    className={`pill ${task.status === "overdue" ? "bg-rose-100 text-rose-700" : "bg-sky-100 text-sky-700"}`}
-                  >
+                  <span className={task.status === "overdue" ? "badge-negative" : "pill bg-[#d9e2ff] text-[#0c306e]"}>
                     {task.status}
                   </span>
                 </div>
-              ))}
-              {!data?.dueToday.length && !data?.overdue.length ? (
-                <EmptyState label="No urgent tasks. The suite is in good shape." />
-              ) : null}
-              {!!data?.dueToday.length && !data?.overdue.length ? (
-                <div className="rounded-2xl bg-sky-50 p-4 text-sm text-sky-800">
-                  Today is under control. Nothing is currently overdue.
-                </div>
-              ) : null}
-              {!data?.dueToday.length && !!data?.overdue.length ? (
-                <div className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-800">
-                  Overdue chores need attention first before new tasks stack up.
-                </div>
-              ) : null}
-              {!!data?.dueToday.length && !!data?.overdue.length ? (
-                <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-800">
-                  A mix of due-today and overdue work is active, so this is the fastest place to recover the suite.
-                </div>
-              ) : null}
-            </div>
-          </SectionCard>
-        </div>
+              </div>
+            ))}
+
+            {!priorityTasks.length ? (
+              <EmptyState label="No urgent tasks right now. The suite is in a good place." />
+            ) : null}
+          </div>
+        </SectionCard>
+
       </div>
     </div>
   );

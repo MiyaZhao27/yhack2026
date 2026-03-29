@@ -6,6 +6,7 @@ import { authOptions } from "../../../../auth";
 import { connectDatabase } from "../../../../server/config/db";
 import { Suite } from "../../../../server/models/Suite";
 import { User } from "../../../../server/models/User";
+import { getSuiteBalances } from "../../../../server/services/balanceService";
 
 async function getOrCreateCurrentUser(session: any) {
   let currentUser = await User.findById(session.user.id);
@@ -57,6 +58,23 @@ export async function POST(request: NextRequest) {
       previousSuiteId !== nextSuiteId &&
       Types.ObjectId.isValid(previousSuiteId)
     ) {
+      const { balances } = await getSuiteBalances(previousSuiteId, String(currentUser._id));
+      const currentBalance = balances.find(
+        (balance) => balance.userId === String(currentUser._id)
+      );
+      const outstandingDebt = currentBalance?.outstanding ?? 0;
+
+      if (outstandingDebt > 0.005) {
+        return NextResponse.json(
+          {
+            message: `Settle your outstanding debt ($${outstandingDebt.toFixed(
+              2
+            )}) before joining a different suite.`,
+          },
+          { status: 400 }
+        );
+      }
+
       await Suite.findByIdAndUpdate(previousSuiteId, {
         $pull: { memberIds: currentUser._id },
       });

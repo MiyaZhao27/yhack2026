@@ -179,7 +179,7 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
 
         <ReceiptUpload onScanned={handleScanResult} />
 
-        {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+        {error ? <p className="text-sm text-[#8f1d3a]">{error}</p> : null}
       </div>
     );
   }
@@ -188,17 +188,17 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <button
         type="button"
-        className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
+        className="button-ghost px-1 text-sm"
         onClick={() => setStep("upload")}
       >
         <ChevronLeft size={14} /> Back
       </button>
 
       <div className="space-y-3">
-        <p className="text-sm font-medium text-slate-700">Review Items</p>
+        <p className="text-sm font-semibold text-[#4f3f5a]">Review Items</p>
 
         {items.map((item, index) => (
-          <div key={index} className="space-y-2 rounded-xl border border-slate-200 p-3">
+          <div key={index} className="space-y-2 rounded-xl border border-[rgba(108,73,118,0.2)] bg-white/60 p-3">
             <div className="flex gap-2">
               <input
                 className="input flex-1"
@@ -223,7 +223,7 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
                     key={member._id}
                     type="button"
                     className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                      assigned ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
+                      assigned ? "bg-[#2a1738] text-white" : "bg-white text-muted"
                     }`}
                     onClick={() => toggleItemParticipant(index, member._id)}
                   >
@@ -249,8 +249,8 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
         </button>
       </div>
 
-      <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
-        <span className="flex-1 text-sm text-slate-600">Tax &amp; Fees (split proportionally)</span>
+      <div className="flex items-center gap-2 rounded-xl border border-[rgba(108,73,118,0.2)] bg-white/60 px-3 py-2">
+        <span className="flex-1 text-sm text-ink-soft">Tax &amp; Fees (split proportionally)</span>
         <input
           className="input w-28 text-right"
           type="number"
@@ -263,12 +263,12 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
       </div>
 
       {computedSplits.length > 0 ? (
-        <div className="rounded-xl bg-emerald-50 p-3">
-          <p className="mb-2 text-xs font-medium text-emerald-700">
+        <div className="rounded-xl bg-[#e2f7eb] p-3">
+          <p className="mb-2 text-xs font-semibold text-[#00503a]">
             Computed splits (total: {formatCurrency(totalAmount + feesAmount)}):
           </p>
           {computedSplits.map((split) => (
-            <div key={split.participantId} className="flex justify-between text-sm text-emerald-900">
+            <div key={split.participantId} className="flex justify-between text-sm text-[#00503a]">
               <span>{nameFor(split.participantId)}</span>
               <span className="font-medium">{formatCurrency(split.owedAmount)}</span>
             </div>
@@ -276,7 +276,7 @@ export function ReceiptUploadForm({ members, onSubmit, submitting }: Props) {
         </div>
       ) : null}
 
-      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {error ? <p className="text-sm text-[#8f1d3a]">{error}</p> : null}
 
       <button className="button-primary w-full" type="submit" disabled={submitting}>
         {submitting ? "Saving..." : "Save Expense"}

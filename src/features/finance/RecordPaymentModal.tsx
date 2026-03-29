@@ -89,21 +89,21 @@ export function RecordPaymentModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-12"
+      className="modal-shell"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+      <div className="modal-card max-w-md">
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Record Settlement Payment</h2>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700">
+          <h2 className="text-lg font-semibold text-[#2a1738]">Record Settlement Payment</h2>
+          <button type="button" onClick={onClose} className="button-ghost p-1">
             <X size={20} />
           </button>
         </div>
 
         {payerName && receiverName && amount && (
-          <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="mb-4 rounded-xl bg-[#e2f7eb] px-4 py-3 text-sm font-medium text-[#00503a]">
             {payerName} pays {receiverName} {formatCurrency(parseFloat(amount) || 0)}
           </div>
         )}
@@ -111,7 +111,7 @@ export function RecordPaymentModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Paid by</label>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-muted">Paid by</label>
               <select
                 className="input"
                 value={payerId}
@@ -138,7 +138,7 @@ export function RecordPaymentModal({
               </select>
             </div>
             <div className="flex-1">
-              <label className="mb-1 block text-xs font-medium text-slate-600">Paid to</label>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-muted">Paid to</label>
               <select
                 className="input"
                 value={receiverId}
@@ -169,7 +169,7 @@ export function RecordPaymentModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Amount ($)</label>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-muted">Amount ($)</label>
             <input
               className="input"
               type="number"
@@ -188,7 +188,7 @@ export function RecordPaymentModal({
             onChange={(e) => setNote(e.target.value)}
           />
 
-          {error && <p className="text-sm text-rose-600">{error}</p>}
+          {error && <p className="text-sm text-[#8f1d3a]">{error}</p>}
 
           <button className="button-primary w-full" type="submit" disabled={submitting}>
             {submitting ? "Recording..." : "Record Payment"}

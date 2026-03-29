@@ -113,7 +113,7 @@ export function ReceiptUpload({ onScanned }: Props) {
   };
 
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <div className="space-y-3 rounded-2xl border border-[rgba(108,73,118,0.2)] bg-white/60 p-4">
       <div className="flex flex-wrap justify-center gap-2">
         <button
           className="button-secondary text-sm"
@@ -145,7 +145,7 @@ export function ReceiptUpload({ onScanned }: Props) {
           autoPlay
           muted
           playsInline
-          className="min-h-64 w-full rounded-2xl bg-slate-900 object-cover"
+          className="min-h-64 w-full rounded-2xl bg-[#2a1738] object-cover"
         />
         <div className="flex gap-2">
           <button className="button-primary text-sm" type="button" onClick={handleCapture}>
@@ -162,7 +162,7 @@ export function ReceiptUpload({ onScanned }: Props) {
           <img
             src={previewUrl}
             alt="Receipt preview"
-            className="w-full rounded-2xl border border-slate-200 bg-white object-cover"
+            className="w-full rounded-2xl border border-[rgba(108,73,118,0.2)] bg-white object-cover"
           />
           <div className="flex flex-wrap gap-2">
             <button className="button-primary text-sm" type="button" onClick={handleScan} disabled={submitting}>
@@ -176,7 +176,7 @@ export function ReceiptUpload({ onScanned }: Props) {
         </div>
       ) : null}
 
-      <p className={`text-xs ${error || cameraError ? "text-rose-600" : success ? "text-emerald-700" : "text-slate-500"}`}>
+      <p className={`text-xs ${error || cameraError ? "text-[#8f1d3a]" : success ? "text-[#00503a]" : "text-muted"}`}>
         {helperText}
         {!isSupported && !cameraError ? " Camera capture is unavailable here, so use image upload." : ""}
       </p>

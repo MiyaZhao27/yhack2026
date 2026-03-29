@@ -20,7 +20,8 @@ interface SuiteContextValue {
 
 const SuiteContext = createContext<SuiteContextValue | undefined>(undefined);
 
-const STORAGE_KEY = "livewell-suite-id";
+const STORAGE_KEY = "suiteease-suite-id";
+const LEGACY_STORAGE_KEY = "livewell-suite-id";
 
 export function SuiteProvider({ children }: { children: ReactNode }) {
   const [suite, setSuite] = useState<Suite | null>(null);
@@ -31,7 +32,8 @@ export function SuiteProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const suites = await api.get<Suite[]>("/suites");
-      const selectedId = suiteId || localStorage.getItem(STORAGE_KEY) || suites[0]?._id;
+      const selectedId =
+        suiteId || localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY) || suites[0]?._id;
 
       if (!selectedId) {
         setSuite(null);
@@ -41,6 +43,7 @@ export function SuiteProvider({ children }: { children: ReactNode }) {
 
       const suiteData = await api.get<Suite>(`/suites/${selectedId}`);
       localStorage.setItem(STORAGE_KEY, suiteData._id);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
       setSuite(suiteData);
       setMembers(suiteData.members || []);
     } finally {
@@ -51,6 +54,7 @@ export function SuiteProvider({ children }: { children: ReactNode }) {
   const createSuite = async (name: string, memberNames: string[]) => {
     const newSuite = await api.post<Suite>("/suites", { name, members: memberNames });
     localStorage.setItem(STORAGE_KEY, newSuite._id);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
     await refreshSuite(newSuite._id);
   };
 

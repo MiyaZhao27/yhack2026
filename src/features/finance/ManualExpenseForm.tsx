@@ -237,8 +237,8 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
 
       {/* Participants */}
       {splitMethod !== "itemized" && (
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="mb-2 text-sm font-medium text-slate-700">Participants</p>
+        <div className="rounded-xl bg-white/60 p-3">
+          <p className="mb-2 text-sm font-semibold text-[#4f3f5a]">Participants</p>
           <div className="flex flex-wrap gap-2">
             {members.map((m) => {
               const active = participants.includes(m._id);
@@ -247,7 +247,7 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
                   key={m._id}
                   type="button"
                   className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                    active ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600"
+                    active ? "bg-[#2a1738] text-white" : "border border-[rgba(108,73,118,0.2)] bg-white text-ink-soft"
                   }`}
                   onClick={() => toggleParticipant(m._id)}
                 >
@@ -260,8 +260,8 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
       )}
 
       {/* Split method */}
-      <div className="rounded-xl bg-slate-50 p-3">
-        <p className="mb-2 text-sm font-medium text-slate-700">Split Method</p>
+      <div className="rounded-xl bg-white/60 p-3">
+        <p className="mb-2 text-sm font-semibold text-[#4f3f5a]">Split Method</p>
         <div className="flex gap-2">
           {(["equal", "exact", "percentage", "itemized"] as SplitMethod[]).map((method) => (
             <button
@@ -269,8 +269,8 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
               type="button"
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 splitMethod === method
-                  ? "bg-slate-900 text-white"
-                  : "border border-slate-200 bg-white text-slate-600"
+                  ? "bg-[#2a1738] text-white"
+                  : "border border-[rgba(108,73,118,0.2)] bg-white text-ink-soft"
               }`}
               onClick={() => {
                 setSplitMethod(method);
@@ -285,10 +285,10 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
 
       {/* Equal preview */}
       {splitMethod === "equal" && equalPreview.length > 0 && (
-        <div className="rounded-xl bg-emerald-50 p-3">
-          <p className="mb-2 text-xs font-medium text-emerald-700">Each owes:</p>
+        <div className="rounded-xl bg-[#e2f7eb] p-3">
+          <p className="mb-2 text-xs font-semibold text-[#00503a]">Each owes:</p>
           {equalPreview.map((s) => (
-            <div key={s.participantId} className="flex justify-between text-sm text-emerald-900">
+            <div key={s.participantId} className="flex justify-between text-sm text-[#00503a]">
               <span>{nameFor(s.participantId)}</span>
               <span className="font-medium">{formatCurrency(s.owedAmount)}</span>
             </div>
@@ -298,11 +298,11 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
 
       {/* Exact amount inputs */}
       {splitMethod === "exact" && activeMembers.length > 0 && (
-        <div className="rounded-xl bg-slate-50 p-3 space-y-2">
-          <p className="mb-1 text-xs font-medium text-slate-700">Amount per person:</p>
+        <div className="space-y-2 rounded-xl bg-white/60 p-3">
+          <p className="mb-1 text-xs font-semibold text-[#4f3f5a]">Amount per person:</p>
           {activeMembers.map((m) => (
             <div key={m._id} className="flex items-center gap-2">
-              <span className="w-24 shrink-0 text-sm text-slate-700">{m.name}</span>
+              <span className="w-24 shrink-0 text-sm text-[#4f3f5a]">{m.name}</span>
               <input
                 className="input flex-1"
                 type="number"
@@ -316,7 +316,7 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
           ))}
           <p
             className={`text-xs font-medium ${
-              Math.abs(exactSum - totalAmount) < 0.02 ? "text-emerald-600" : "text-rose-600"
+              Math.abs(exactSum - totalAmount) < 0.02 ? "text-[#00503a]" : "text-[#8f1d3a]"
             }`}
           >
             Sum: {formatCurrency(exactSum)} / {formatCurrency(totalAmount)}
@@ -327,11 +327,11 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
 
       {/* Percentage inputs */}
       {splitMethod === "percentage" && activeMembers.length > 0 && (
-        <div className="rounded-xl bg-slate-50 p-3 space-y-2">
-          <p className="mb-1 text-xs font-medium text-slate-700">Percentage per person:</p>
+        <div className="space-y-2 rounded-xl bg-white/60 p-3">
+          <p className="mb-1 text-xs font-semibold text-[#4f3f5a]">Percentage per person:</p>
           {activeMembers.map((m) => (
             <div key={m._id} className="flex items-center gap-2">
-              <span className="w-24 shrink-0 text-sm text-slate-700">{m.name}</span>
+              <span className="w-24 shrink-0 text-sm text-[#4f3f5a]">{m.name}</span>
               <input
                 className="input w-20"
                 type="number"
@@ -342,9 +342,9 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
                 value={getEntryValue(m._id)}
                 onChange={(e) => setEntryValue(m._id, e.target.value)}
               />
-              <span className="text-sm text-slate-500">%</span>
+              <span className="text-sm text-muted">%</span>
               {totalAmount > 0 && getEntryValue(m._id) && (
-                <span className="ml-auto text-sm text-slate-500">
+                <span className="ml-auto text-sm text-muted">
                   = {formatCurrency((parseFloat(getEntryValue(m._id)) / 100) * totalAmount)}
                 </span>
               )}
@@ -352,7 +352,7 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
           ))}
           <p
             className={`text-xs font-medium ${
-              Math.abs(percentSum - 100) < 0.1 ? "text-emerald-600" : "text-rose-600"
+              Math.abs(percentSum - 100) < 0.1 ? "text-[#00503a]" : "text-[#8f1d3a]"
             }`}
           >
             Total: {percentSum.toFixed(1)}%
@@ -364,9 +364,9 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
       {/* Itemized items */}
       {splitMethod === "itemized" && (
         <div className="space-y-3">
-          <p className="text-sm font-medium text-slate-700">Items</p>
+          <p className="text-sm font-semibold text-[#4f3f5a]">Items</p>
           {lineItems.map((item, index) => (
-            <div key={index} className="space-y-2 rounded-xl border border-slate-200 p-3">
+            <div key={index} className="space-y-2 rounded-xl border border-[rgba(108,73,118,0.2)] bg-white/60 p-3">
               <div className="flex gap-2">
                 <input
                   className="input flex-1"
@@ -393,7 +393,7 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
                 />
                 <button
                   type="button"
-                  className="text-slate-400 hover:text-rose-500 transition-colors px-1"
+                  className="px-1 text-muted transition-colors hover:text-[#8f1d3a]"
                   onClick={() => setLineItems((current) => current.filter((_, i) => i !== index))}
                 >
                   ✕
@@ -407,7 +407,7 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
                       key={m._id}
                       type="button"
                       className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                        assigned ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
+                        assigned ? "bg-[#2a1738] text-white" : "bg-white text-muted"
                       }`}
                       onClick={() =>
                         setLineItems((current) =>
@@ -440,8 +440,8 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
           >
             + Add Item
           </button>
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
-            <span className="flex-1 text-sm text-slate-600">Tax &amp; Fees (split proportionally)</span>
+          <div className="flex items-center gap-2 rounded-xl border border-[rgba(108,73,118,0.2)] bg-white/60 px-3 py-2">
+            <span className="flex-1 text-sm text-ink-soft">Tax &amp; Fees (split proportionally)</span>
             <input
               className="input w-28 text-right"
               type="number"
@@ -454,8 +454,8 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
           </div>
 
           {lineItems.length > 0 && itemizedSubtotal > 0 && (
-            <div className="rounded-xl bg-emerald-50 p-3">
-              <p className="mb-2 text-xs font-medium text-emerald-700">
+            <div className="rounded-xl bg-[#e2f7eb] p-3">
+              <p className="mb-2 text-xs font-semibold text-[#00503a]">
                 Computed splits (total: {formatCurrency(itemizedTotal)}):
               </p>
               {applyProportionalFees(
@@ -470,7 +470,7 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
                 ),
                 itemizedFees
               ).map((split) => (
-                <div key={split.participantId} className="flex justify-between text-sm text-emerald-900">
+                <div key={split.participantId} className="flex justify-between text-sm text-[#00503a]">
                   <span>{nameFor(split.participantId)}</span>
                   <span className="font-medium">{formatCurrency(split.owedAmount)}</span>
                 </div>
@@ -480,7 +480,7 @@ export function ManualExpenseForm({ members, initialData, onSubmit, submitting }
         </div>
       )}
 
-      {error && <p className="text-sm text-rose-600">{error}</p>}
+      {error && <p className="text-sm text-[#8f1d3a]">{error}</p>}
 
       <button className="button-primary w-full" type="submit" disabled={submitting}>
         {submitting ? "Saving..." : initialData ? "Save Changes" : "Save Expense"}

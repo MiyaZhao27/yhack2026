@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Plus, X } from "lucide-react";
 
 import { api } from "../lib/api/client";
 import { EmptyState } from "../components/EmptyState";
@@ -28,6 +29,13 @@ function startOfCalendarGrid(date: Date) {
   const gridStart = new Date(firstDay);
   gridStart.setDate(firstDay.getDate() - offset);
   return gridStart;
+}
+
+function startOfWeek(date: Date) {
+  const weekStart = new Date(date);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  return weekStart;
 }
 
 function addDays(date: Date, amount: number) {
@@ -102,8 +110,14 @@ export function TasksPage({ currentUser }: TasksPageProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [googleTasks, setGoogleTasks] = useState<GoogleTaskItem[]>([]);
   const [googleTasksError, setGoogleTasksError] = useState<string | null>(null);
-  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [calendarCursor, setCalendarCursor] = useState(() => new Date());
+  const [calendarRange, setCalendarRange] = useState<"day" | "week" | "month">("month");
   const [statusFilter, setStatusFilter] = useState<"all" | Task["status"]>("all");
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
+  const [showNewTaskModal, setShowNewTaskModal] = useState(false);
+  const [showDayDetailsModal, setShowDayDetailsModal] = useState(false);
+  const [viewMode, setViewMode] = useState<"calendar" | "board">("calendar");
+  const [selectedDayKey, setSelectedDayKey] = useState(() => dateKey(new Date()));
   const [form, setForm] = useState({
     title: "",
     notes: "",
@@ -149,6 +163,12 @@ export function TasksPage({ currentUser }: TasksPageProps) {
     }
   }, [currentUser?.id]);
 
+  useEffect(() => {
+    if (assigneeFilter !== "all" && !members.some((member) => member._id === assigneeFilter)) {
+      setAssigneeFilter("all");
+    }
+  }, [assigneeFilter, members]);
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!suite?._id) return;
@@ -172,6 +192,7 @@ export function TasksPage({ currentUser }: TasksPageProps) {
       dueDate: "",
       recurrence: "none",
     });
+    setShowNewTaskModal(false);
     setGoogleTasksError(response.googleTaskSyncError || null);
     await loadTasks();
     await loadGoogleTasks();
@@ -190,14 +211,30 @@ export function TasksPage({ currentUser }: TasksPageProps) {
 
   const nameFor = (id: string) => members.find((member) => member._id === id)?.name || "Unknown";
   const today = new Date();
-  const gridStart = startOfCalendarGrid(calendarMonth);
-  const calendarDays = Array.from({ length: 35 }, (_, index) => addDays(gridStart, index));
+  const monthStart = startOfMonth(calendarCursor);
+  const monthGridStart = startOfCalendarGrid(calendarCursor);
+  const weekStart = startOfWeek(calendarCursor);
+  const weekDays = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+  const monthDays = Array.from({ length: 35 }, (_, index) => addDays(monthGridStart, index));
+  const dayOnly = [new Date(calendarCursor)];
+  const activeDays = calendarRange === "day" ? dayOnly : calendarRange === "week" ? weekDays : monthDays;
+  const activeRangeStart = activeDays[0] || new Date(calendarCursor);
+  const assigneeFilteredTasks =
+    assigneeFilter === "all" ? tasks : tasks.filter((task) => task.assigneeId === assigneeFilter);
   const visibleTasks =
-    statusFilter === "all" ? tasks : tasks.filter((task) => task.status === statusFilter);
-  const calendarItems = [...googleTasks, ...addRecurringTaskInstances(tasks, gridStart, calendarDays)].filter(
+    statusFilter === "all"
+      ? assigneeFilteredTasks
+      : assigneeFilteredTasks.filter((task) => task.status === statusFilter);
+  const includeGoogleTasks = assigneeFilter === "all" || assigneeFilter === currentUser?.id;
+  const calendarItems = [
+    ...(includeGoogleTasks ? googleTasks : []),
+    ...addRecurringTaskInstances(assigneeFilteredTasks, activeRangeStart, activeDays),
+  ].filter(
     (task, index, all) =>
       all.findIndex(
-        (candidate) => candidate.title === task.title && (candidate.due || "").slice(0, 10) === (task.due || "").slice(0, 10)
+        (candidate) =>
+          candidate.title === task.title &&
+          (candidate.due || "").slice(0, 10) === (task.due || "").slice(0, 10)
       ) === index
   );
   const tasksByDay = calendarItems.reduce<Record<string, GoogleTaskItem[]>>((accumulator, task) => {
@@ -208,211 +245,431 @@ export function TasksPage({ currentUser }: TasksPageProps) {
     accumulator[key] = [...(accumulator[key] || []), task];
     return accumulator;
   }, {});
+  const selectedDayTasks = tasksByDay[selectedDayKey] || [];
+
+  useEffect(() => {
+    setSelectedDayKey(dateKey(calendarCursor));
+  }, [calendarCursor, calendarRange]);
+
+  const shiftCalendar = (direction: -1 | 1) => {
+    setCalendarCursor((current) => {
+      const next = new Date(current);
+      if (calendarRange === "day") {
+        next.setDate(next.getDate() + direction);
+      } else if (calendarRange === "week") {
+        next.setDate(next.getDate() + direction * 7);
+      } else {
+        next.setMonth(next.getMonth() + direction);
+      }
+      return next;
+    });
+  };
+
+  const openDayDetails = (key: string) => {
+    setSelectedDayKey(key);
+    setShowDayDetailsModal(true);
+  };
+
+  const calendarTitle =
+    calendarRange === "month"
+      ? monthStart.toLocaleString("en-US", { month: "long", year: "numeric" })
+      : calendarRange === "week"
+        ? `${weekDays[0]?.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${weekDays[6]?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+        : calendarCursor.toLocaleDateString("en-US", {
+            weekday: "short",
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          });
 
   return (
-    <div className="space-y-6">
-      <SectionCard title="Task Calendar" subtitle="SuiteEase recurring tasks and synced Google Tasks in a monthly view">
-        {googleTasksError ? <div className="mb-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800">{googleTasksError}</div> : null}
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <button
-            className="button-secondary"
-            type="button"
-            onClick={() =>
-              setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))
-            }
-          >
-            Previous
-          </button>
-          <h3 className="text-lg font-semibold text-slate-900">
-            {calendarMonth.toLocaleString("en-US", { month: "long", year: "numeric" })}
-          </h3>
-          <button
-            className="button-secondary"
-            type="button"
-            onClick={() =>
-              setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))
-            }
-          >
-            Next
-          </button>
-        </div>
-
-        <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-            <div key={day} className="py-2">
-              {day}
+    <>
+      {showNewTaskModal ? (
+        <div className="modal-shell" onClick={(event) => event.target === event.currentTarget && setShowNewTaskModal(false)}>
+          <div className="modal-card max-w-md">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-[#2a1738]">New Task</h2>
+              <button className="button-ghost p-1" type="button" onClick={() => setShowNewTaskModal(false)}>
+                <X size={18} />
+              </button>
             </div>
-          ))}
-        </div>
 
-        <div className="grid grid-cols-7 gap-2">
-          {calendarDays.map((day) => {
-            const key = dateKey(day);
-            const dayTasks = tasksByDay[key] || [];
-            const inCurrentMonth = day.getMonth() === calendarMonth.getMonth();
-
-            return (
-              <div
-                key={key}
-                className={`min-h-28 rounded-2xl border p-3 text-left ${
-                  inCurrentMonth ? "bg-white" : "bg-slate-50 text-slate-400"
-                } ${sameDay(day, today) ? "border-sky-300 shadow-sm" : "border-slate-200"}`}
+            <form className="space-y-3" onSubmit={handleSubmit}>
+              <input
+                className="input"
+                placeholder="Wash dishes"
+                required
+                value={form.title}
+                onChange={(event) => setForm({ ...form, title: event.target.value })}
+              />
+              <textarea
+                className="input min-h-20"
+                placeholder="Optional details"
+                value={form.notes}
+                onChange={(event) => setForm({ ...form, notes: event.target.value })}
+              />
+              <select
+                className="input"
+                value={form.assigneeId}
+                onChange={(event) => setForm({ ...form, assigneeId: event.target.value })}
               >
-                <div className="mb-2 flex items-center justify-between">
-                  <span className={`text-sm font-semibold ${sameDay(day, today) ? "text-sky-700" : "text-slate-700"}`}>
-                    {day.getDate()}
-                  </span>
-                  {dayTasks.length ? <span className="pill bg-sky-100 text-sky-700">{dayTasks.length}</span> : null}
-                </div>
+                <option value="">Assign to...</option>
+                {members.map((member) => (
+                  <option key={member._id} value={member._id}>
+                    {member.name}
+                  </option>
+                ))}
+              </select>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <input
+                  className="input"
+                  type="date"
+                  required
+                  value={form.dueDate}
+                  onChange={(event) => setForm({ ...form, dueDate: event.target.value })}
+                />
+                <select
+                  className="input"
+                  value={form.recurrence}
+                  onChange={(event) => setForm({ ...form, recurrence: event.target.value })}
+                >
+                  <option value="none">No recurrence</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              </div>
+              <button className="button-primary w-full" type="submit">
+                Add Task
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
-                <div className="space-y-2">
-                  {dayTasks.slice(0, 3).map((task) => (
-                    <div key={task.id} className="rounded-xl bg-sky-50 px-2 py-1 text-xs text-sky-900">
-                      <p className="truncate font-medium">{task.title}</p>
+      {showDayDetailsModal ? (
+        <div className="modal-shell sm:hidden" onClick={(event) => event.target === event.currentTarget && setShowDayDetailsModal(false)}>
+          <div className="modal-card max-w-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-[#2a1738]">
+                {new Date(`${selectedDayKey}T00:00:00`).toLocaleDateString("en-US", {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </h2>
+              <button className="button-ghost p-1" type="button" onClick={() => setShowDayDetailsModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {selectedDayTasks.map((task) => (
+                <div key={task.id} className="rounded-xl bg-[#f6eef9] px-3 py-2 text-sm text-[#4f3f5a]">
+                  <p className="font-semibold">{task.title}</p>
+                </div>
+              ))}
+              {!selectedDayTasks.length ? <p className="text-sm text-muted">No tasks on this day.</p> : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <SectionCard
+        title="Tasks"
+        action={
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <div className="segmented w-full sm:w-auto">
+              <button
+                className={viewMode === "calendar" ? "segment-button-active" : "segment-button"}
+                onClick={() => setViewMode("calendar")}
+              >
+                Calendar
+              </button>
+              <button
+                className={viewMode === "board" ? "segment-button-active" : "segment-button"}
+                onClick={() => setViewMode("board")}
+              >
+                Board
+              </button>
+            </div>
+            <button className="button-primary w-full px-3 py-2 text-xs sm:w-auto" onClick={() => setShowNewTaskModal(true)}>
+              <Plus size={14} /> New Task
+            </button>
+          </div>
+        }
+      >
+        {googleTasksError ? (
+          <div className="mb-3 rounded-2xl bg-[#ffdcbf] px-4 py-3 text-sm font-medium text-[#7a4300]">
+            {googleTasksError}
+          </div>
+        ) : null}
+
+        {viewMode === "calendar" ? (
+          <>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <button
+                className="button-secondary px-3 py-2 text-xs"
+                type="button"
+                onClick={() => shiftCalendar(-1)}
+              >
+                Previous
+              </button>
+              <h3 className="text-base font-semibold text-[#2a1738] sm:text-lg">
+                {calendarTitle}
+              </h3>
+              <button
+                className="button-secondary px-3 py-2 text-xs"
+                type="button"
+                onClick={() => shiftCalendar(1)}
+              >
+                Next
+              </button>
+            </div>
+
+            <div className="mb-3 flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="segmented w-full sm:w-auto">
+                {(["day", "week", "month"] as const).map((range) => (
+                  <button
+                    key={range}
+                    className={calendarRange === range ? "segment-button-active" : "segment-button"}
+                    type="button"
+                    onClick={() => setCalendarRange(range)}
+                  >
+                    {range[0].toUpperCase() + range.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <select
+                className="input h-10 w-full sm:w-56"
+                value={assigneeFilter}
+                onChange={(event) => setAssigneeFilter(event.target.value)}
+              >
+                <option value="all">All members</option>
+                {members.map((member) => (
+                  <option key={member._id} value={member._id}>
+                    {member.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {calendarRange === "month" ? (
+              <>
+                <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                    <div key={day} className="py-1.5">
+                      {day}
                     </div>
                   ))}
-                  {dayTasks.length > 3 ? (
-                    <p className="text-xs text-slate-500">+{dayTasks.length - 3} more</p>
+                </div>
+
+                <div className="grid grid-cols-7 gap-1.5">
+                  {monthDays.map((day) => {
+                    const key = dateKey(day);
+                    const dayTasks = tasksByDay[key] || [];
+                    const inCurrentMonth = day.getMonth() === monthStart.getMonth();
+                    const isToday = sameDay(day, today);
+                    const isSelected = key === selectedDayKey;
+
+                    return (
+                      <button
+                        type="button"
+                        key={key}
+                        onClick={() => {
+                          setSelectedDayKey(key);
+                          if (typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches) {
+                            setShowDayDetailsModal(true);
+                          }
+                        }}
+                        className={`min-h-[108px] rounded-2xl border px-2 py-2 text-left ${
+                          inCurrentMonth ? "bg-white/80 text-[#2a1738]" : "bg-white/40 text-muted"
+                        } ${
+                          isToday
+                            ? "border-[#8b1d44]/55 shadow-[0_8px_20px_-18px_rgba(107,0,46,0.7)]"
+                            : "border-[rgba(108,73,118,0.22)]"
+                        } ${isSelected ? "ring-1 ring-[#8b1d44]/55" : ""} min-h-[86px] sm:min-h-[108px]`}
+                      >
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <span className={`text-xs font-bold ${isToday ? "text-[#8b1d44]" : "text-[#4f3f5a]"}`}>
+                            {day.getDate()}
+                          </span>
+                          {dayTasks.length ? (
+                            <span className="pill bg-[#d9e2ff] px-2 py-0.5 text-[10px] text-[#0c306e]">
+                              {dayTasks.length}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="hidden space-y-1 sm:block">
+                          {dayTasks.slice(0, 2).map((task) => (
+                            <div key={task.id} className="rounded-lg bg-[#f6eef9] px-1.5 py-1 text-[11px] text-[#4f3f5a]">
+                              <p className="truncate font-semibold">{task.title}</p>
+                            </div>
+                          ))}
+                          {dayTasks.length > 2 ? (
+                            <p className="text-[11px] font-medium text-muted">+{dayTasks.length - 2} more</p>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-1 flex items-center gap-1 sm:hidden">
+                          {dayTasks.slice(0, 3).map((task) => (
+                            <span key={task.id} className="h-1.5 w-1.5 rounded-full bg-[#8b1d44]/70" />
+                          ))}
+                          {dayTasks.length > 3 ? (
+                            <span className="text-[10px] font-semibold text-[#8b1d44]">+{dayTasks.length - 3}</span>
+                          ) : null}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : null}
+
+            {calendarRange === "week" ? (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
+                {weekDays.map((day) => {
+                  const key = dateKey(day);
+                  const dayTasks = tasksByDay[key] || [];
+                  const isToday = sameDay(day, today);
+                  return (
+                    <button
+                      type="button"
+                      key={key}
+                      onClick={() => {
+                        if (typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches) {
+                          openDayDetails(key);
+                        }
+                      }}
+                      className={`rounded-2xl border px-3 py-3 ${isToday ? "border-[#8b1d44]/55" : "border-[rgba(108,73,118,0.22)]"} bg-white/80`}
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                        {day.toLocaleDateString("en-US", { weekday: "short" })}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-[#2a1738]">
+                        {day.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </p>
+                      <div className="mt-2 space-y-1.5">
+                        {dayTasks.map((task) => (
+                          <div key={task.id} className="rounded-lg bg-[#f6eef9] px-2 py-1.5 text-xs text-[#4f3f5a]">
+                            <p className="font-semibold">{task.title}</p>
+                          </div>
+                        ))}
+                        {!dayTasks.length ? <p className="text-xs text-muted">No tasks</p> : null}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {calendarRange === "day" ? (
+              <div className="rounded-2xl border border-[rgba(108,73,118,0.22)] bg-white/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                  {calendarCursor.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                </p>
+                <div className="mt-2 space-y-2">
+                  {(tasksByDay[dateKey(calendarCursor)] || []).map((task) => (
+                    <div key={task.id} className="rounded-xl bg-[#f6eef9] px-3 py-2 text-sm text-[#4f3f5a]">
+                      <p className="font-semibold">{task.title}</p>
+                    </div>
+                  ))}
+                  {!(tasksByDay[dateKey(calendarCursor)] || []).length ? (
+                    <p className="text-sm text-muted">No tasks on this day.</p>
                   ) : null}
                 </div>
               </div>
-            );
-          })}
-        </div>
+            ) : null}
 
-        {!calendarItems.length && !googleTasksError ? (
-          <div className="mt-4">
-            <EmptyState label="No calendar tasks found yet." />
-          </div>
-        ) : null}
-      </SectionCard>
-
-      <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-      <SectionCard title="New Task" subtitle="Assign a chore with just enough structure">
-        {currentUser ? (
-          <div className="mb-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-            <p className="font-semibold text-slate-900">{currentUser.name || "Signed-in user"}</p>
-            <p>{currentUser.email}</p>
-            {currentUser.id ? <p className="mt-1 text-xs text-slate-500">User ID: {currentUser.id}</p> : null}
-          </div>
-        ) : null}
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <input
-            className="input"
-            placeholder="Wash dishes"
-            required
-            value={form.title}
-            onChange={(event) => setForm({ ...form, title: event.target.value })}
-          />
-          <textarea
-            className="input min-h-24"
-            placeholder="Optional details for the Google Task"
-            value={form.notes}
-            onChange={(event) => setForm({ ...form, notes: event.target.value })}
-          />
-          <select
-            className="input"
-            value={form.assigneeId}
-            onChange={(event) => setForm({ ...form, assigneeId: event.target.value })}
-          >
-            <option value="">Assign to...</option>
-            {members.map((member) => (
-              <option key={member._id} value={member._id}>
-                {member.name}
-              </option>
-            ))}
-          </select>
-          <input
-            className="input"
-            type="date"
-            required
-            value={form.dueDate}
-            onChange={(event) => setForm({ ...form, dueDate: event.target.value })}
-          />
-          <select
-            className="input"
-            value={form.recurrence}
-            onChange={(event) => setForm({ ...form, recurrence: event.target.value })}
-          >
-            <option value="none">No recurrence</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-          </select>
-          <button className="button-primary w-full" type="submit">
-            Add Task
-          </button>
-        </form>
-      </SectionCard>
-
-      <SectionCard title="Task Board" subtitle="Pending, done, and overdue in one place">
-        <div className="mb-4 flex flex-wrap gap-2">
-          {[
-            { label: "All", value: "all" as const },
-            { label: "Pending", value: "pending" as const },
-            { label: "Overdue", value: "overdue" as const },
-            { label: "Done", value: "done" as const },
-          ].map((option) => (
-            <button
-              key={option.value}
-              className={statusFilter === option.value ? "button-primary" : "button-secondary"}
-              type="button"
-              onClick={() => setStatusFilter(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div className="space-y-3">
-          {visibleTasks.map((task) => (
-            <div key={task._id} className="rounded-2xl bg-slate-50 p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="font-semibold text-slate-900">{task.title}</p>
-                  <p className="text-sm text-slate-500">
-                    {nameFor(task.assigneeId)} • Due {formatTaskDate(task.dueDate)} • {task.recurrence}
-                  </p>
-                  {task.notes ? <p className="mt-1 text-sm text-slate-500">{task.notes}</p> : null}
-                </div>
-                <div className="flex gap-2">
-                  {currentUser?.id === task.assigneeId && !task.googleTaskId ? (
-                    <button className="button-secondary" onClick={() => addTaskToGoogleTasks(task)}>
-                      Add to Google Tasks
-                    </button>
-                  ) : null}
-                  {task.status !== "done" ? (
-                    <button className="button-secondary" onClick={() => updateStatus(task, "done")}>
-                      Done
-                    </button>
-                  ) : null}
-                </div>
-              </div>
+            {!calendarItems.length && !googleTasksError ? (
               <div className="mt-3">
-                <span
-                  className={`pill ${
-                    task.status === "done"
-                      ? "bg-emerald-100 text-emerald-800"
-                      : task.status === "overdue"
-                        ? "bg-rose-100 text-rose-700"
-                        : "bg-amber-100 text-amber-800"
-                  }`}
-                >
-                  {task.status}
-                </span>
+                <EmptyState label="No calendar tasks found yet." />
               </div>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              {[
+                { label: "All", value: "all" as const },
+                { label: "Pending", value: "pending" as const },
+                { label: "Overdue", value: "overdue" as const },
+                { label: "Done", value: "done" as const },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  className={statusFilter === option.value ? "segment-button-active" : "segment-button"}
+                  type="button"
+                  onClick={() => setStatusFilter(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+              <select
+                className="input h-10 min-w-[160px] flex-1 sm:max-w-[220px]"
+                value={assigneeFilter}
+                onChange={(event) => setAssigneeFilter(event.target.value)}
+              >
+                <option value="all">All members</option>
+                {members.map((member) => (
+                  <option key={member._id} value={member._id}>
+                    {member.name}
+                  </option>
+                ))}
+              </select>
             </div>
-          ))}
-          {!visibleTasks.length ? (
-            <EmptyState
-              label={
-                tasks.length
-                  ? "No tasks match this filter yet."
-                  : "No tasks yet. Add the first suite chore."
-              }
-            />
-          ) : null}
-        </div>
+
+            <div className="space-y-2.5">
+              {visibleTasks.map((task) => (
+                <div key={task._id} className="surface-soft rounded-2xl px-3 py-3">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-[#2a1738]">{task.title}</p>
+                      <p className="text-xs text-muted">
+                        {nameFor(task.assigneeId)} · Due {formatTaskDate(task.dueDate)} · {task.recurrence}
+                      </p>
+                      {task.notes ? <p className="mt-1 text-xs text-ink-soft">{task.notes}</p> : null}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {currentUser?.id === task.assigneeId && !task.googleTaskId ? (
+                        <button className="button-secondary px-3 py-1.5 text-xs" onClick={() => addTaskToGoogleTasks(task)}>
+                          Add to Google
+                        </button>
+                      ) : null}
+                      {task.status !== "done" ? (
+                        <button className="button-secondary px-3 py-1.5 text-xs" onClick={() => updateStatus(task, "done")}>
+                          Mark Done
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span
+                      className={
+                        task.status === "done"
+                          ? "badge-positive"
+                          : task.status === "overdue"
+                            ? "badge-negative"
+                            : "pill bg-[#ffdcbf] text-[#7a4300]"
+                      }
+                    >
+                      {task.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {!visibleTasks.length ? (
+                <EmptyState
+                  label={
+                    tasks.length
+                      ? "No tasks match this filter yet."
+                      : "No tasks yet. Add the first suite chore."
+                  }
+                />
+              ) : null}
+            </div>
+          </>
+        )}
       </SectionCard>
-      </div>
-    </div>
+    </>
   );
 }

@@ -17,7 +17,7 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, app: "LiveWell API" });
+  res.json({ ok: true, app: "SuiteEase API" });
 });
 
 app.use("/api/suites", suiteRoutes);

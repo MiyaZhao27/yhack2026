@@ -1,10 +1,12 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
+import { Types } from "mongoose";
 
 import { authOptions } from "../../../auth";
 import { connectDatabase } from "../../../server/config/db";
 import { Suite } from "../../../server/models/Suite";
 import { User } from "../../../server/models/User";
+import { getSuiteBalances } from "../../../server/services/balanceService";
 import { generateInviteCode } from "../../../server/utils/inviteCode";
 
 function serializeMember(member: any) {
@@ -60,12 +62,39 @@ export async function POST(request: NextRequest) {
     const { name } = (await request.json()) as { name: string };
 
     const currentUser = await getOrCreateCurrentUser(session);
+    const previousSuiteId = currentUser.suiteId ? String(currentUser.suiteId) : null;
+
+    if (previousSuiteId && Types.ObjectId.isValid(previousSuiteId)) {
+      const { balances } = await getSuiteBalances(previousSuiteId, String(currentUser._id));
+      const currentBalance = balances.find(
+        (balance) => balance.userId === String(currentUser._id)
+      );
+      const outstandingDebt = currentBalance?.outstanding ?? 0;
+
+      if (outstandingDebt > 0.005) {
+        return NextResponse.json(
+          {
+            message: `Settle your outstanding debt ($${outstandingDebt.toFixed(
+              2
+            )}) before creating a new suite.`,
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     const suite = await Suite.create({
       name,
       memberIds: [currentUser._id],
       inviteCode: generateInviteCode(),
     });
+
+    if (previousSuiteId && Types.ObjectId.isValid(previousSuiteId)) {
+      await Suite.findByIdAndUpdate(previousSuiteId, {
+        $pull: { memberIds: currentUser._id },
+      });
+    }
+
     currentUser.suiteId = suite._id;
     currentUser.onboardingComplete = true;
     await currentUser.save();

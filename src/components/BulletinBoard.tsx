@@ -13,7 +13,7 @@ import { STICKY_NOTE_HEIGHT, STICKY_NOTE_WIDTH, StickyNote } from "./StickyNote"
 const NOTE_PADDING = 16;
 const COLOR_OPTIONS: BulletinNote["color"][] = ["red", "green", "blue", "yellow"];
 const DEFAULT_BOARD_WIDTH = 720;
-const DEFAULT_BOARD_HEIGHT = 420;
+const DEFAULT_BOARD_HEIGHT = 360;
 const DRAG_SAVE_DELAY_MS = 1000;
 
 function clamp(value: number, min: number, max: number) {
@@ -120,7 +120,7 @@ export function BulletinBoard() {
       });
       setError(null);
     } catch {
-      // Keep the local position and let the next refresh retry from Mongo state.
+      // Keep local note position and sync on the next refresh.
     }
   };
 
@@ -194,8 +194,16 @@ export function BulletinBoard() {
       if (!boardRef.current) return;
 
       const bounds = boardRef.current.getBoundingClientRect();
-      const nextX = clamp(event.clientX - bounds.left - dragState.pointerOffsetX, 0, Math.max(0, bounds.width - STICKY_NOTE_WIDTH));
-      const nextY = clamp(event.clientY - bounds.top - dragState.pointerOffsetY, 0, Math.max(0, bounds.height - STICKY_NOTE_HEIGHT));
+      const nextX = clamp(
+        event.clientX - bounds.left - dragState.pointerOffsetX,
+        0,
+        Math.max(0, bounds.width - STICKY_NOTE_WIDTH)
+      );
+      const nextY = clamp(
+        event.clientY - bounds.top - dragState.pointerOffsetY,
+        0,
+        Math.max(0, bounds.height - STICKY_NOTE_HEIGHT)
+      );
 
       setNotes((currentNotes) =>
         currentNotes.map((note) => (note._id === dragState.id ? { ...note, x: nextX, y: nextY } : note))
@@ -255,38 +263,36 @@ export function BulletinBoard() {
 
   return (
     <SectionCard
-      title="Bulletin Board"
-      subtitle="Leave quick shared notes without cluttering the rest of the dashboard."
+      title="Bulletin"
       action={
         <div className="relative">
           <button
             type="button"
             aria-label="Add sticky note"
-            className="button-secondary inline-flex h-10 w-10 items-center justify-center p-0"
+            className="button-secondary h-9 w-9 rounded-xl p-0"
             onClick={() => setMenuOpen((open) => !open)}
           >
-            <Plus size={18} />
+            <Plus size={17} />
           </button>
           {menuOpen ? (
-            <div className="absolute left-0 top-12 z-40 min-w-40 rounded-2xl border border-slate-200 bg-white p-2 shadow-card">
+            <div className="absolute left-0 top-11 z-40 min-w-40 rounded-2xl border border-[rgba(108,73,118,0.28)] bg-white/95 p-2 shadow-[0_20px_40px_-30px_rgba(42,23,56,0.8)]">
               {COLOR_OPTIONS.map((color) => (
                 <button
                   key={color}
                   type="button"
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-[#4f3f5a] hover:bg-[#f8ecf7]"
                   onClick={() => createNote(color)}
                 >
                   <span
                     className={`h-4 w-4 rounded-full ${
                       color === "red"
-                        ? "bg-rose-400"
+                        ? "bg-[#f06790]"
                         : color === "green"
-                          ? "bg-emerald-400"
+                          ? "bg-[#41bf80]"
                           : color === "blue"
-                            ? ""
-                            : "bg-amber-400"
+                            ? "bg-[#34a4e0]"
+                            : "bg-[#f3c325]"
                     }`}
-                    style={color === "blue" ? { backgroundColor: "#7dd3fc" } : undefined}
                   />
                   {color[0].toUpperCase() + color.slice(1)} note
                 </button>
@@ -298,14 +304,22 @@ export function BulletinBoard() {
     >
       <div
         ref={boardRef}
-        className="relative min-h-[420px] overflow-hidden rounded-[28px] border border-dashed border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.95),_rgba(248,250,252,0.95))]"
+        className="relative min-h-[360px] overflow-hidden rounded-[1.6rem] border border-[#d8b38f] bg-[#dfb98f]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, rgba(161,95,53,0.25) 1px, transparent 0), linear-gradient(180deg, #e7c39e 0%, #deb489 100%)",
+          backgroundSize: "10px 10px, 100% 100%",
+        }}
       >
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.24)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.24)_1px,transparent_1px)] bg-[size:26px_26px]" />
+        <div className="pointer-events-none absolute left-3 top-3 h-4 w-4 rounded-full bg-[#e33d54] shadow-md" />
+        <div className="pointer-events-none absolute bottom-4 right-7 h-4 w-4 rounded-full bg-[#2588ee] shadow-md" />
+
         {error ? (
-          <div className="absolute left-4 right-4 top-4 z-40 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <div className="absolute left-3 right-3 top-3 z-40 rounded-xl bg-[#ffe0ea] px-3 py-2 text-sm text-[#8f1d3a]">
             {error}
           </div>
         ) : null}
+
         {notes.map((note) => (
           <StickyNote
             key={note._id}
@@ -349,13 +363,15 @@ export function BulletinBoard() {
             }}
           />
         ))}
+
         {!loading && !notes.length ? (
-          <div className="flex h-full min-h-[420px] items-center justify-center px-6 text-center text-sm text-slate-500">
+          <div className="flex h-full min-h-[360px] items-center justify-center px-8 text-center text-sm font-semibold text-[#7f5f45]">
             Add a sticky note to pin reminders, plans, or tiny asks for the suite.
           </div>
         ) : null}
+
         {loading ? (
-          <div className="flex h-full min-h-[420px] items-center justify-center px-6 text-center text-sm text-slate-500">
+          <div className="flex h-full min-h-[360px] items-center justify-center px-8 text-center text-sm font-semibold text-[#7f5f45]">
             Loading shared notes...
           </div>
         ) : null}

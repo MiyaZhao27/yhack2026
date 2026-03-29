@@ -30,7 +30,8 @@ interface SuiteContextValue {
 
 const SuiteContext = createContext<SuiteContextValue | undefined>(undefined);
 
-const STORAGE_KEY = "livewell-suite-id";
+const STORAGE_KEY = "suiteease-suite-id";
+const LEGACY_STORAGE_KEY = "livewell-suite-id";
 
 export function SuiteProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
@@ -46,7 +47,7 @@ export function SuiteProvider({ children }: { children: ReactNode }) {
   const refreshSuite = async (suiteId?: string) => {
     setLoading(true);
     try {
-      const selectedId = suiteId || localStorage.getItem(STORAGE_KEY);
+      const selectedId = suiteId || localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
 
       if (!selectedId) {
         clearSuiteState();
@@ -56,10 +57,12 @@ export function SuiteProvider({ children }: { children: ReactNode }) {
       try {
         const suiteData = await api.get<Suite>(`/suites/${selectedId}`);
         localStorage.setItem(STORAGE_KEY, suiteData._id);
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
         setSuite(suiteData);
         setMembers(suiteData.members || []);
       } catch {
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
         clearSuiteState();
       }
     } finally {
@@ -70,6 +73,7 @@ export function SuiteProvider({ children }: { children: ReactNode }) {
   const createSuite = async (name: string) => {
     const newSuite = await api.post<Suite>("/suites", { name });
     localStorage.setItem(STORAGE_KEY, newSuite._id);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
     setSuite(newSuite);
     setMembers(newSuite.members || []);
     setLoading(false);
@@ -79,6 +83,7 @@ export function SuiteProvider({ children }: { children: ReactNode }) {
   const joinSuite = async (inviteCode: string) => {
     const joinedSuite = await api.post<Suite>("/suites/join", { inviteCode });
     localStorage.setItem(STORAGE_KEY, joinedSuite._id);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
     await refreshSuite(joinedSuite._id);
     return joinedSuite;
   };
