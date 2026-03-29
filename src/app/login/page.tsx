@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import { Fredoka, Poppins } from "next/font/google";
 import { useRouter } from "next/navigation";
 import { signIn, signOut, useSession } from "next-auth/react";
 
-const fredoka = Fredoka({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
-const poppins = Poppins({ subsets: ["latin"], weight: ["300", "400", "500", "600"] });
+const fredoka = { className: "" };
+const poppins = { className: "" };
 
 const phrases = [
   "people take out their trash",
@@ -25,7 +24,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (session?.user) {
-      router.push(session.user.suiteId ? "/" : "/onboarding");
+      router.replace("/auth/redirect");
     }
   }, [session, router]);
 
@@ -161,7 +160,7 @@ export default function LoginPage() {
                     <p className="text-sm text-slate-500">{session.user.email}</p>
                   </div>
                   <button
-                    onClick={() => router.push(session.user.suiteId ? "/" : "/onboarding")}
+                    onClick={() => router.push("/auth/redirect")}
                     className={`w-full py-4 rounded-xl text-white font-bold text-lg active:scale-95 transition-transform ${fredoka.className}`}
                     style={{
                       background: "linear-gradient(135deg, #6b002e 0%, #8b1d44 100%)",
@@ -181,7 +180,7 @@ export default function LoginPage() {
               ) : (
                 <div className="space-y-4">
                   <button
-                    onClick={() => signIn("google", { callbackUrl: "/login" })}
+                    onClick={() => signIn("google", { callbackUrl: "/auth/redirect" })}
                     className="w-full flex items-center justify-center gap-3 py-4 rounded-xl font-semibold text-slate-700 transition active:scale-95 hover:shadow-md"
                     style={{
                       background: "white",

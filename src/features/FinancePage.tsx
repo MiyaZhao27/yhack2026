@@ -325,7 +325,7 @@ export function FinancePage() {
                       <div className="flex-1">
                         <p className="font-semibold text-slate-900">{expense.title}</p>
                         <p className="text-xs text-slate-500">
-                          Paid by {nameFor(expense.paidBy)} · {formatDateTime(expense.date ?? expense.createdAt)}
+                          Paid by {nameFor(expense.paidBy)} · Added {formatDateTime(expense.createdAt)}
                         </p>
                       </div>
                       <p className="font-semibold text-slate-900">

@@ -1,6 +1,5 @@
 import { Expense } from "../models/Expense";
 import { Settlement } from "../models/Settlement";
-import { ShoppingItem } from "../models/ShoppingItem";
 import { Task } from "../models/Task";
 import { User } from "../models/User";
 
@@ -198,33 +197,23 @@ export async function getSuiteBalances(suiteId: string, userId?: string) {
 }
 
 export async function getFairnessSummary(suiteId: string) {
-  const [members, tasks, shoppingItems, expenses] = (await Promise.all([
+  const [members, tasks, expenses] = (await Promise.all([
     User.find({ suiteId }).lean(),
     Task.find({ suiteId, status: "done" }).lean(),
-    ShoppingItem.find({ suiteId, status: "bought" }).lean(),
     Expense.find({ suiteId }).lean(),
-  ])) as [any[], any[], any[], any[]];
+  ])) as [any[], any[], any[]];
 
   const taskCounts = new Map<string, number>();
-  const shoppingCounts = new Map<string, number>();
   const expensePaid = new Map<string, number>();
 
   members.forEach((member: any) => {
     taskCounts.set(String(member._id), 0);
-    shoppingCounts.set(String(member._id), 0);
     expensePaid.set(String(member._id), 0);
   });
 
   tasks.forEach((task: any) => {
     const key = String(task.assigneeId);
     taskCounts.set(key, (taskCounts.get(key) ?? 0) + 1);
-  });
-
-  shoppingItems.forEach((item: any) => {
-    if (item.boughtBy) {
-      const key = String(item.boughtBy);
-      shoppingCounts.set(key, (shoppingCounts.get(key) ?? 0) + 1);
-    }
   });
 
   expenses.forEach((expense: any) => {
@@ -236,7 +225,6 @@ export async function getFairnessSummary(suiteId: string) {
     userId: String(member._id),
     name: member.name,
     tasksCompleted: taskCounts.get(String(member._id)) ?? 0,
-    shoppingBought: shoppingCounts.get(String(member._id)) ?? 0,
     expensesPaid: expensePaid.get(String(member._id)) ?? 0,
   }));
 }

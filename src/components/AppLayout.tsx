@@ -3,7 +3,7 @@
 import { ReactNode } from "react";
 import { useSession } from "next-auth/react";
 
-import { Home, LogIn, Receipt, ShoppingBasket, Sparkles, Wrench } from "lucide-react";
+import { Home, Receipt, Sparkles, Wrench } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,10 +12,8 @@ import { useSuite } from "../context/SuiteContext";
 const navItems = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/tasks", label: "Tasks", icon: Wrench },
-  { href: "/shopping", label: "Shopping", icon: ShoppingBasket },
   { href: "/finance", label: "Finance", icon: Receipt },
   { href: "/setup", label: "Setup", icon: Sparkles },
-  { href: "/login", label: "Login", icon: LogIn },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
@@ -39,7 +37,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600">
               {showSuiteDetails
-                ? "Manage chores, shopping, and shared spending in one calm, demo-ready space."
+                ? "Manage chores, shared notes, and spending in one calm, demo-ready space."
                 : "Sign in to view your suite, suitemates, chores, and shared planning tools."}
             </p>
           </div>

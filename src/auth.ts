@@ -58,6 +58,15 @@ export const authOptions: NextAuthOptions = {
         (await User.findOne({ googleId: account.providerAccountId })) ||
         (await User.findOne({ email: user.email.toLowerCase() }));
 
+      const dbUser = existingUser
+        ? existingUser
+        : await User.create({
+            ...updatePayload,
+            email: user.email.toLowerCase(),
+            suiteId: null,
+            onboardingComplete: false,
+          });
+
       if (existingUser) {
         existingUser.name = user.name ?? existingUser.name;
         existingUser.email = user.email.toLowerCase();
@@ -77,14 +86,11 @@ export const authOptions: NextAuthOptions = {
         }
 
         await existingUser.save();
-      } else {
-        await User.create({
-          ...updatePayload,
-          email: user.email.toLowerCase(),
-          suiteId: null,
-          onboardingComplete: false,
-        });
       }
+
+      (user as typeof user & { id?: string; onboardingComplete?: boolean }).id = String(dbUser._id);
+      (user as typeof user & { onboardingComplete?: boolean }).onboardingComplete =
+        dbUser.onboardingComplete;
 
       return true;
     },
@@ -92,7 +98,11 @@ export const authOptions: NextAuthOptions = {
       await connectDatabase();
 
       const dbUser: any =
-        user?.email
+        user && "id" in user && user.id
+          ? await User.findById(user.id).lean()
+          : token.userId
+            ? await User.findById(token.userId).lean()
+            : user?.email
           ? await User.findOne({ email: user.email }).lean()
           : token.email
             ? await User.findOne({ email: token.email }).lean()
