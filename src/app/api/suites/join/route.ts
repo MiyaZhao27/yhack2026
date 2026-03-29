@@ -52,7 +52,9 @@ export async function POST(request: NextRequest) {
     currentUser.onboardingComplete = true;
     await currentUser.save();
 
-    suite.memberIds = Array.from(new Set([...(suite.memberIds || []).map((memberId) => String(memberId)), String(currentUser._id)]));
+    suite.memberIds = Array.from(
+      new Set([...(suite.memberIds || []).map((memberId: unknown) => String(memberId)), String(currentUser._id)])
+    );
     await suite.save();
 
     const members = await User.find({ suiteId: suite._id }).lean();
