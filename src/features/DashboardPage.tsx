@@ -10,7 +10,11 @@ import { SectionCard } from "../components/SectionCard";
 import { useSuite } from "../context/SuiteContext";
 import { DashboardData } from "../types";
 
-export function DashboardPage() {
+interface DashboardPageProps {
+  showBulletin?: boolean;
+}
+
+export function DashboardPage({ showBulletin = true }: DashboardPageProps) {
   const { suite, members } = useSuite();
   const [data, setData] = useState<DashboardData | null>(null);
   const { data: session, status } = useSession();
@@ -56,10 +60,14 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(290px,1fr)] xl:items-start">
-      <div className="relative z-10">
-        <BulletinBoard />
-      </div>
+    <div
+      className={`grid gap-4 ${showBulletin ? "xl:grid-cols-[minmax(0,2fr)_minmax(290px,1fr)] xl:items-start" : ""}`}
+    >
+      {showBulletin ? (
+        <div className="relative z-10">
+          <BulletinBoard />
+        </div>
+      ) : null}
 
       <div className="space-y-4">
         <SectionCard title="My Tasks">

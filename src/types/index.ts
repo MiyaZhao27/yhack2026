@@ -40,6 +40,8 @@ export interface BulletinNote {
   suiteId: string;
   color: "red" | "green" | "blue" | "yellow";
   text: string;
+  mediaUrl?: string | null;
+  mediaMimeType?: string | null;
   x: number;
   y: number;
   rotationDeg: number;

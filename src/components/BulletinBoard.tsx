@@ -8,7 +8,7 @@ import { api } from "../lib/api/client";
 import { useSuite } from "../context/SuiteContext";
 import { BulletinNote } from "../types";
 import { SectionCard } from "./SectionCard";
-import { STICKY_NOTE_HEIGHT, STICKY_NOTE_WIDTH, StickyNote } from "./StickyNote";
+import { getStickyNoteDimensions, STICKY_NOTE_HEIGHT, STICKY_NOTE_WIDTH, StickyNote } from "./StickyNote";
 
 const NOTE_PADDING = 16;
 const COLOR_OPTIONS: BulletinNote["color"][] = ["red", "green", "blue", "yellow"];
@@ -43,11 +43,13 @@ function findOpenPosition(notes: BulletinNote[], width: number, height: number) 
   attempts.push({ x: 0, y: 0 });
 
   for (const attempt of attempts) {
-    const conflict = notes.some(
-      (note) =>
-        Math.abs(note.x - attempt.x) < STICKY_NOTE_WIDTH - NOTE_PADDING &&
-        Math.abs(note.y - attempt.y) < STICKY_NOTE_HEIGHT - NOTE_PADDING
-    );
+    const conflict = notes.some((note) => {
+      const { width: noteWidth, height: noteHeight } = getStickyNoteDimensions(note);
+      return (
+        Math.abs(note.x - attempt.x) < noteWidth - NOTE_PADDING &&
+        Math.abs(note.y - attempt.y) < noteHeight - NOTE_PADDING
+      );
+    });
 
     if (!conflict) {
       return attempt;
@@ -71,10 +73,11 @@ export function BulletinBoard() {
   const [error, setError] = useState<string | null>(null);
   const [dragState, setDragState] = useState<{
     id: string;
+    pointerId: number;
     pointerOffsetX: number;
     pointerOffsetY: number;
-    startX: number;
-    startY: number;
+    noteWidth: number;
+    noteHeight: number;
   } | null>(null);
 
   useEffect(() => {
@@ -189,20 +192,29 @@ export function BulletinBoard() {
   useEffect(() => {
     if (!dragState) return;
     interactionRef.current = true;
+    const previousUserSelect = document.body.style.userSelect;
+    const previousCursor = document.body.style.cursor;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "grabbing";
 
     const handlePointerMove = (event: PointerEvent) => {
       if (!boardRef.current) return;
+      if (event.pointerId !== dragState.pointerId) return;
 
       const bounds = boardRef.current.getBoundingClientRect();
+      const scaleX = bounds.width > 0 ? bounds.width / boardWidth : 1;
+      const scaleY = bounds.height > 0 ? bounds.height / boardHeight : 1;
+      const pointerBoardX = (event.clientX - bounds.left) / scaleX;
+      const pointerBoardY = (event.clientY - bounds.top) / scaleY;
       const nextX = clamp(
-        event.clientX - bounds.left - dragState.pointerOffsetX,
+        pointerBoardX - dragState.pointerOffsetX,
         0,
-        Math.max(0, bounds.width - STICKY_NOTE_WIDTH)
+        Math.max(0, boardWidth - dragState.noteWidth)
       );
       const nextY = clamp(
-        event.clientY - bounds.top - dragState.pointerOffsetY,
+        pointerBoardY - dragState.pointerOffsetY,
         0,
-        Math.max(0, bounds.height - STICKY_NOTE_HEIGHT)
+        Math.max(0, boardHeight - dragState.noteHeight)
       );
 
       setNotes((currentNotes) =>
@@ -210,7 +222,8 @@ export function BulletinBoard() {
       );
     };
 
-    const handlePointerUp = () => {
+    const handlePointerUp = (event: PointerEvent) => {
+      if (event.pointerId !== dragState.pointerId) return;
       const activeNote = notesRef.current.find((note) => note._id === dragState.id);
       setDragState(null);
       interactionRef.current = false;
@@ -231,12 +244,16 @@ export function BulletinBoard() {
 
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
 
     return () => {
+      document.body.style.userSelect = previousUserSelect;
+      document.body.style.cursor = previousCursor;
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
     };
-  }, [dragState]);
+  }, [boardHeight, boardWidth, dragState]);
 
   const createNote = async (color: BulletinNote["color"]) => {
     if (!suite?._id) return;
@@ -337,14 +354,21 @@ export function BulletinBoard() {
               }
             }}
             onDragStart={(event, currentNote) => {
+              if (event.button !== 0 || !boardRef.current) return;
               interactionRef.current = true;
-              const target = event.currentTarget.getBoundingClientRect();
+              const bounds = boardRef.current.getBoundingClientRect();
+              const scaleX = bounds.width > 0 ? bounds.width / boardWidth : 1;
+              const scaleY = bounds.height > 0 ? bounds.height / boardHeight : 1;
+              const pointerBoardX = (event.clientX - bounds.left) / scaleX;
+              const pointerBoardY = (event.clientY - bounds.top) / scaleY;
+              const { width, height } = getStickyNoteDimensions(currentNote);
               setDragState({
                 id: currentNote._id,
-                pointerOffsetX: event.clientX - target.left,
-                pointerOffsetY: event.clientY - target.top,
-                startX: currentNote.x,
-                startY: currentNote.y,
+                pointerId: event.pointerId,
+                pointerOffsetX: pointerBoardX - currentNote.x,
+                pointerOffsetY: pointerBoardY - currentNote.y,
+                noteWidth: width,
+                noteHeight: height,
               });
             }}
             onTextCommit={async (id, text) => {

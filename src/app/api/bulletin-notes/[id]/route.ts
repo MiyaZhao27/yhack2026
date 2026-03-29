@@ -41,6 +41,12 @@ export async function PATCH(
   const payload = await request.json();
   note.color = payload.color ?? note.color;
   note.text = typeof payload.text === "string" ? payload.text : note.text;
+  if (typeof payload.mediaUrl === "string" || payload.mediaUrl === null) {
+    note.mediaUrl = payload.mediaUrl;
+  }
+  if (typeof payload.mediaMimeType === "string" || payload.mediaMimeType === null) {
+    note.mediaMimeType = payload.mediaMimeType;
+  }
   note.x = typeof payload.x === "number" ? payload.x : note.x;
   note.y = typeof payload.y === "number" ? payload.y : note.y;
   note.rotationDeg =

@@ -20,16 +20,33 @@ const pinClasses: Record<BulletinNote["color"], string> = {
 
 export const STICKY_NOTE_WIDTH = 176;
 export const STICKY_NOTE_HEIGHT = 168;
+export const STICKY_NOTE_MEDIA_WIDTH = 220;
+export const STICKY_NOTE_MEDIA_HEIGHT = 250;
+
+export function getStickyNoteDimensions(note: Pick<BulletinNote, "mediaUrl">) {
+  if (note.mediaUrl) {
+    return {
+      width: STICKY_NOTE_MEDIA_WIDTH,
+      height: STICKY_NOTE_MEDIA_HEIGHT,
+    };
+  }
+  return {
+    width: STICKY_NOTE_WIDTH,
+    height: STICKY_NOTE_HEIGHT,
+  };
+}
 
 export function StickyNote({
   note,
   isDragging,
+  dragDisabled = false,
   onDelete,
   onDragStart,
   onTextCommit,
 }: {
   note: BulletinNote;
   isDragging: boolean;
+  dragDisabled?: boolean;
   onDelete: (id: string) => void;
   onDragStart: (event: PointerEvent<HTMLDivElement>, note: BulletinNote) => void;
   onTextCommit: (id: string, text: string) => void;
@@ -37,6 +54,8 @@ export function StickyNote({
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(note.text);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const { width, height } = getStickyNoteDimensions(note);
+  const mediaHeight = note.mediaUrl ? Math.max(108, height - 114) : 0;
 
   useEffect(() => {
     if (!isEditing) {
@@ -57,20 +76,25 @@ export function StickyNote({
 
   return (
     <div
-      className={`absolute rounded-md border-2 px-4 pb-3 pt-8 shadow-[0_16px_28px_-14px_rgba(48,34,15,0.55)] ${colorClasses[note.color]} ${
+      className={`board-note pointer-events-auto absolute select-none touch-none rounded-md border-2 px-4 pb-3 pt-8 shadow-[0_16px_28px_-14px_rgba(48,34,15,0.55)] ${colorClasses[note.color]} ${
         isDragging
           ? "z-30 cursor-grabbing transition-none"
-          : "z-10 cursor-grab transition-[left,top,transform,box-shadow] duration-200 hover:shadow-[0_20px_30px_-16px_rgba(48,34,15,0.68)]"
+          : dragDisabled
+            ? "z-10 cursor-default transition-[left,top,transform,box-shadow] duration-200 hover:shadow-[0_20px_30px_-16px_rgba(48,34,15,0.68)]"
+            : "z-10 cursor-grab active:cursor-grabbing transition-[left,top,transform,box-shadow] duration-200 hover:shadow-[0_20px_30px_-16px_rgba(48,34,15,0.68)]"
       }`}
       style={{
         left: note.x,
         top: note.y,
-        width: STICKY_NOTE_WIDTH,
-        height: STICKY_NOTE_HEIGHT,
+        width,
+        height,
         transform: `rotate(${note.rotationDeg}deg)`,
+        willChange: isDragging ? "left, top" : undefined,
       }}
       onPointerDown={(event) => {
-        if (isEditing) return;
+        if (isEditing || dragDisabled || event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
         onDragStart(event, note);
       }}
       onDoubleClick={() => setIsEditing(true)}
@@ -91,10 +115,26 @@ export function StickyNote({
         x
       </button>
 
+      {note.mediaUrl ? (
+        <div
+          className="mb-2 overflow-hidden rounded-md border border-white/55 bg-white/60"
+          style={{ height: mediaHeight }}
+        >
+          <img
+            src={note.mediaUrl}
+            alt={note.text || "Pinned media"}
+            className="h-full w-full object-cover"
+            draggable={false}
+          />
+        </div>
+      ) : null}
+
       {isEditing ? (
         <textarea
           ref={textareaRef}
-          className="h-full w-full resize-none bg-transparent text-[13px] font-semibold leading-5 text-inherit outline-none placeholder:text-[#7f6d86]/80"
+          className={`w-full resize-none select-text bg-transparent text-[13px] font-semibold leading-5 text-inherit outline-none placeholder:text-[#7f6d86]/80 ${
+            note.mediaUrl ? "h-14" : "h-full"
+          }`}
           placeholder="Leave a quick note..."
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -113,7 +153,11 @@ export function StickyNote({
           }}
         />
       ) : (
-        <p className="max-h-full overflow-hidden whitespace-pre-wrap text-[14px] font-semibold leading-5">
+        <p
+          className={`overflow-hidden whitespace-pre-wrap text-[14px] font-semibold leading-5 ${
+            note.mediaUrl ? "max-h-[58px]" : "max-h-full"
+          }`}
+        >
           {note.text}
         </p>
       )}

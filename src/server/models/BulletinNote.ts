@@ -6,6 +6,8 @@ export interface BulletinNoteDocument {
   suiteId: Types.ObjectId | string;
   color: BulletinNoteColor;
   text: string;
+  mediaUrl?: string | null;
+  mediaMimeType?: string | null;
   x: number;
   y: number;
   rotationDeg: number;
@@ -20,6 +22,8 @@ const bulletinNoteSchema = new Schema<BulletinNoteDocument>(
       required: true,
     },
     text: { type: String, required: true, trim: true, default: "New note" },
+    mediaUrl: { type: String, default: null },
+    mediaMimeType: { type: String, default: null },
     x: { type: Number, required: true, default: 0 },
     y: { type: Number, required: true, default: 0 },
     rotationDeg: { type: Number, required: true, default: 0 },

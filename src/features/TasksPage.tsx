@@ -164,6 +164,13 @@ export function TasksPage({ currentUser }: TasksPageProps) {
   }, [currentUser?.id]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(max-width: 639px)").matches) {
+      setCalendarRange("week");
+    }
+  }, []);
+
+  useEffect(() => {
     if (assigneeFilter !== "all" && !members.some((member) => member._id === assigneeFilter)) {
       setAssigneeFilter("all");
     }

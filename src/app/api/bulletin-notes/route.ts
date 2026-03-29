@@ -38,6 +38,9 @@ export async function POST(request: NextRequest) {
     suiteId: currentUser.suiteId,
     color: payload.color,
     text: payload.text ?? "New note",
+    mediaUrl: typeof payload.mediaUrl === "string" ? payload.mediaUrl : null,
+    mediaMimeType:
+      typeof payload.mediaMimeType === "string" ? payload.mediaMimeType : null,
     x: Number(payload.x ?? 0),
     y: Number(payload.y ?? 0),
     rotationDeg: Number(payload.rotationDeg ?? 0),
