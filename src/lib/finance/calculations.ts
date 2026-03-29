@@ -45,6 +45,16 @@ export function computeItemizedSplits(items: ExpenseItem[]): ExpenseSplit[] {
   }));
 }
 
+export function applyProportionalFees(splits: ExpenseSplit[], feesAmount: number): ExpenseSplit[] {
+  if (!feesAmount || splits.length === 0) return splits;
+  const subtotal = splits.reduce((sum, s) => sum + s.owedAmount, 0);
+  if (subtotal === 0) return splits;
+  return splits.map((s) => ({
+    ...s,
+    owedAmount: Number((s.owedAmount + (s.owedAmount / subtotal) * feesAmount).toFixed(2)),
+  }));
+}
+
 export function validateExactSplits(
   splits: { owedAmount: number }[],
   totalAmount: number

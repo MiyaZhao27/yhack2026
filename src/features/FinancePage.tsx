@@ -352,8 +352,35 @@ export function FinancePage() {
                     </div>
 
                     {isExpanded && (
-                      <div className="border-t border-slate-200 px-4 pb-4 pt-3">
-                        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                      <div className="border-t border-slate-200 px-4 pb-4 pt-3 space-y-3">
+                        {expense.splitMethod === "itemized" && expense.items?.length > 0 && (
+                          <div>
+                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                              Items
+                            </p>
+                            <div className="space-y-1">
+                              {expense.items.map((item, i) => (
+                                <div
+                                  key={i}
+                                  className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm"
+                                >
+                                  <div>
+                                    <span className="font-medium text-slate-700">{item.name}</span>
+                                    {item.assignedParticipants?.length > 0 && (
+                                      <span className="ml-2 text-xs text-slate-400">
+                                        {item.assignedParticipants.map((id) => nameFor(id)).join(", ")}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="font-medium text-slate-700">
+                                    {formatCurrency(item.amount)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                           Split breakdown
                         </p>
                         <div className="space-y-1.5">

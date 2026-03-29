@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { normalizeReceipt } from "../../../lib/ocr/normalizeReceipt";
-import { OCRSpaceError, parseReceiptWithOCRSpace } from "../../../lib/ocr/ocrSpace";
+import { parseReceiptWithLava } from "../../../lib/ocr/parseReceiptWithAI";
 
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
@@ -14,9 +13,9 @@ const ALLOWED_IMAGE_TYPES = new Set([
 
 export async function POST(request: Request) {
   try {
-    if (!process.env.OCR_SPACE_API_KEY) {
+    if (!process.env.LAVA_API_KEY) {
       return NextResponse.json(
-        { message: "OCR receipt scanning is not configured on the server." },
+        { message: "Receipt scanning is not configured on the server." },
         { status: 500 }
       );
     }
@@ -35,22 +34,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const rawResponse = await parseReceiptWithOCRSpace(file);
-    const receipt = normalizeReceipt(rawResponse);
+    const base64 = Buffer.from(await file.arrayBuffer()).toString("base64");
+    const ai = await parseReceiptWithLava(base64, file.type);
 
-    return NextResponse.json({ receipt });
-  } catch (error) {
-    if (error instanceof OCRSpaceError) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
+    if (!ai) {
+      return NextResponse.json(
+        { message: "Could not extract data from the receipt. Please try a clearer photo." },
+        { status: 422 }
+      );
     }
 
+    return NextResponse.json({
+      receipt: {
+        merchantName: ai.merchantName,
+        purchaseDate: ai.purchaseDate,
+        total: ai.total,
+        subtotal: ai.subtotal,
+        fees: ai.fees > 0 ? ai.fees : undefined,
+        items: ai.items.length > 0 ? ai.items : undefined,
+      },
+    });
+  } catch (error) {
     if (error instanceof Error) {
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
-
-    return NextResponse.json(
-      { message: "Receipt scanning failed unexpectedly." },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Receipt scanning failed unexpectedly." }, { status: 500 });
   }
 }
