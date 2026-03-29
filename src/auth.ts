@@ -3,6 +3,7 @@ import Google from "next-auth/providers/google";
 
 import { connectDatabase } from "./server/config/db";
 import { User } from "./server/models/User";
+import { GOOGLE_TASKS_SCOPE } from "./server/services/googleTasksService";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
@@ -15,6 +16,12 @@ export const authOptions: NextAuthOptions = {
           prompt: "consent",
           access_type: "offline",
           response_type: "code",
+          scope: [
+            "openid",
+            "email",
+            "profile",
+            GOOGLE_TASKS_SCOPE,
+          ].join(" "),
         },
       },
     }),
@@ -28,22 +35,56 @@ export const authOptions: NextAuthOptions = {
 
       await connectDatabase();
 
-      await User.findOneAndUpdate(
-        { $or: [{ googleId: account.providerAccountId }, { email: user.email }] },
-        {
-          $set: {
-            name: user.name ?? "",
-            email: user.email,
-            image: user.image ?? null,
-            googleId: account.providerAccountId,
-          },
-          $setOnInsert: {
-            suiteId: null,
-            onboardingComplete: false,
-          },
-        },
-        { upsert: true, new: true }
-      );
+      const updatePayload: Record<string, unknown> = {
+        name: user.name ?? "",
+        email: user.email,
+        image: user.image ?? null,
+        googleId: account.providerAccountId,
+      };
+
+      if (account.access_token) {
+        updatePayload.googleAccessToken = account.access_token;
+      }
+
+      if (account.refresh_token) {
+        updatePayload.googleRefreshToken = account.refresh_token;
+      }
+
+      if (account.expires_at) {
+        updatePayload.googleTokenExpiresAt = new Date(account.expires_at * 1000);
+      }
+
+      const existingUser =
+        (await User.findOne({ googleId: account.providerAccountId })) ||
+        (await User.findOne({ email: user.email.toLowerCase() }));
+
+      if (existingUser) {
+        existingUser.name = user.name ?? existingUser.name;
+        existingUser.email = user.email.toLowerCase();
+        existingUser.image = user.image ?? existingUser.image ?? null;
+        existingUser.googleId = account.providerAccountId;
+
+        if (account.access_token) {
+          existingUser.googleAccessToken = account.access_token;
+        }
+
+        if (account.refresh_token) {
+          existingUser.googleRefreshToken = account.refresh_token;
+        }
+
+        if (account.expires_at) {
+          existingUser.googleTokenExpiresAt = new Date(account.expires_at * 1000);
+        }
+
+        await existingUser.save();
+      } else {
+        await User.create({
+          ...updatePayload,
+          email: user.email.toLowerCase(),
+          suiteId: null,
+          onboardingComplete: false,
+        });
+      }
 
       return true;
     },
@@ -65,6 +106,10 @@ export const authOptions: NextAuthOptions = {
 
       if (account?.providerAccountId) {
         token.googleId = account.providerAccountId;
+      }
+
+      if (account?.access_token) {
+        token.googleAccessToken = account.access_token;
       }
 
       return token;

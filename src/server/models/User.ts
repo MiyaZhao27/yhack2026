@@ -5,6 +5,10 @@ export interface UserDocument {
   email?: string;
   image?: string | null;
   googleId?: string;
+  googleAccessToken?: string | null;
+  googleRefreshToken?: string | null;
+  googleTokenExpiresAt?: Date | null;
+  googleTasksListId?: string | null;
   suiteId?: Types.ObjectId | string | null;
   onboardingComplete: boolean;
 }
@@ -15,6 +19,10 @@ const userSchema = new Schema<UserDocument>(
     email: { type: String, unique: true, sparse: true, trim: true, lowercase: true },
     image: { type: String, default: null },
     googleId: { type: String, unique: true, sparse: true },
+    googleAccessToken: { type: String, default: null },
+    googleRefreshToken: { type: String, default: null },
+    googleTokenExpiresAt: { type: Date, default: null },
+    googleTasksListId: { type: String, default: null },
     suiteId: { type: Schema.Types.ObjectId, ref: "Suite", default: null },
     onboardingComplete: { type: Boolean, default: false },
   },

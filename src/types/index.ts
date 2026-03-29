@@ -17,11 +17,22 @@ export interface Task {
   _id: string;
   suiteId: string;
   title: string;
+  notes?: string | null;
   assigneeId: string;
   dueDate: string;
   status: "pending" | "done" | "overdue";
   recurrence: "none" | "daily" | "weekly";
+  googleTaskId?: string | null;
+  googleTaskSyncedAt?: string | null;
   completedAt?: string | null;
+}
+
+export interface GoogleTaskItem {
+  id: string;
+  title: string;
+  due?: string | null;
+  notes?: string | null;
+  webViewLink?: string | null;
 }
 
 export interface ShoppingItem {
