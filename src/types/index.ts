@@ -1,7 +1,9 @@
 export interface Member {
   _id: string;
   name: string;
-  suiteId: string;
+  suiteId?: string | null;
+  suiteIds?: string[];
+  activeSuiteId?: string | null;
   email?: string;
 }
 
@@ -121,6 +123,7 @@ export interface FairnessRow {
 export interface DashboardData {
   dueToday: Task[];
   overdue: Task[];
+  upcoming: Task[];
   recentExpenses: Expense[];
   balances: Balance[];
   settleUps: { from: string; fromId?: string; to: string; toId?: string; amount: number }[];

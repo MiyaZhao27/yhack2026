@@ -1,7 +1,5 @@
-import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
-import { authOptions } from "../../../auth";
 import { connectDatabase } from "../../../server/config/db";
 import { Expense } from "../../../server/models/Expense";
 import { Task } from "../../../server/models/Task";
@@ -11,6 +9,8 @@ import { BulletinNote } from "../../../server/models/BulletinNote";
 import { User } from "../../../server/models/User";
 import { getFairnessSummary, getSuiteBalances } from "../../../server/services/balanceService";
 import { normalizeTaskStatus } from "../../../server/utils/date";
+import { getSessionUserContext } from "../../../server/utils/sessionUser";
+import { buildSuiteMembershipQuery } from "../../../server/utils/suiteMembership";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -22,9 +22,9 @@ function fmt(n: number) {
 }
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.id ? String(session.user.id) : "";
-  const suiteId = session?.user?.suiteId ? String(session.user.suiteId) : "";
+  const currentUser = await getSessionUserContext();
+  const userId = currentUser?.userId ?? "";
+  const suiteId = currentUser?.suiteId ?? "";
 
   if (!userId || !suiteId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
   const [suite, members, expenses, tasks, settlements, bulletinNotes, balanceData, fairness] = await Promise.all([
     Suite.findById(suiteId).lean(),
-    User.find({ suiteId }).lean(),
+    User.find(buildSuiteMembershipQuery(suiteId)).lean(),
     Expense.find({ suiteId }).sort({ createdAt: -1 }).lean(),
     Task.find({ suiteId }).sort({ dueDate: 1 }).lean(),
     Settlement.find({ suiteId }).sort({ date: -1 }).lean(),

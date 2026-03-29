@@ -3,24 +3,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDatabase } from "../../../../server/config/db";
 import { BulletinNote } from "../../../../server/models/BulletinNote";
 import { getSessionUserContext } from "../../../../server/utils/sessionUser";
+import { userHasSuiteAccess } from "../../../../server/utils/suiteMembership";
 
 async function getAuthorizedNote(id: string) {
   const currentUser = await getSessionUserContext();
-  const sessionSuiteId = currentUser?.suiteId ?? "";
-  if (!currentUser || !sessionSuiteId) {
-    return { sessionSuiteId, note: null, unauthorized: true };
+  if (!currentUser) {
+    return { note: null, unauthorized: true };
   }
 
   const note = await BulletinNote.findById(id);
   if (!note) {
-    return { sessionSuiteId, note: null, unauthorized: false };
+    return { note: null, unauthorized: false };
   }
 
-  if (String(note.suiteId) !== sessionSuiteId) {
-    return { sessionSuiteId, note: null, unauthorized: true };
+  if (!userHasSuiteAccess(currentUser, String(note.suiteId))) {
+    return { note: null, unauthorized: true };
   }
 
-  return { sessionSuiteId, note, unauthorized: false };
+  return { note, unauthorized: false };
 }
 
 export async function PATCH(

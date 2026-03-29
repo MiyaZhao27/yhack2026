@@ -17,7 +17,7 @@ export default async function Page() {
         id: session.user.id,
         name: session.user.name,
         email: session.user.email,
-        suiteId: session.user.suiteId,
+        suiteId: session.user.activeSuiteId ?? session.user.suiteId,
       }}
     />
   );

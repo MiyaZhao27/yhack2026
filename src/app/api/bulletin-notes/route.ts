@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDatabase } from "../../../server/config/db";
 import { BulletinNote } from "../../../server/models/BulletinNote";
 import { getSessionUserContext } from "../../../server/utils/sessionUser";
+import { userHasSuiteAccess } from "../../../server/utils/suiteMembership";
 
 export async function GET(request: NextRequest) {
   await connectDatabase();
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   const suiteId = request.nextUrl.searchParams.get("suiteId");
-  if (!suiteId || suiteId !== currentUser.suiteId) {
+  if (!suiteId || !userHasSuiteAccess(currentUser, suiteId)) {
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
@@ -30,12 +31,12 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = await request.json();
-  if (String(payload.suiteId) !== currentUser.suiteId) {
+  if (!userHasSuiteAccess(currentUser, String(payload.suiteId))) {
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
   const note = await BulletinNote.create({
-    suiteId: currentUser.suiteId,
+    suiteId: String(payload.suiteId),
     color: payload.color,
     text: payload.text ?? "New note",
     mediaUrl: typeof payload.mediaUrl === "string" ? payload.mediaUrl : null,

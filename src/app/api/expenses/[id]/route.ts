@@ -5,6 +5,7 @@ import { Expense } from "../../../../server/models/Expense";
 import { getSuiteBalances } from "../../../../server/services/balanceService";
 import { recomputeNetting } from "../../../../server/services/settlementService";
 import { getSessionUserContext } from "../../../../server/utils/sessionUser";
+import { userHasSuiteAccess } from "../../../../server/utils/suiteMembership";
 import {
   computeEqualSplits,
   computeExactSplits,
@@ -36,7 +37,7 @@ export async function PATCH(
   const isInvolvedInCurrent =
     currentPaidBy === currentUser.userId || currentParticipants.includes(currentUser.userId);
 
-  if (currentSuiteId !== currentUser.suiteId || !isInvolvedInCurrent) {
+  if (!userHasSuiteAccess(currentUser, currentSuiteId) || !isInvolvedInCurrent) {
     return NextResponse.json(
       { error: "You can only update expenses that involve you." },
       { status: 403 }
@@ -120,7 +121,7 @@ export async function DELETE(
     String(expense.paidBy) === currentUser.userId ||
     (expense.participants ?? []).some((pid: unknown) => String(pid) === currentUser.userId);
 
-  if (expenseSuiteId !== currentUser.suiteId || !isInvolved) {
+  if (!userHasSuiteAccess(currentUser, expenseSuiteId) || !isInvolved) {
     return NextResponse.json(
       { error: "You can only delete expenses that involve you." },
       { status: 403 }

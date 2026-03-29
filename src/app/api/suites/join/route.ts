@@ -6,6 +6,11 @@ import { authOptions } from "../../../../auth";
 import { connectDatabase } from "../../../../server/config/db";
 import { Suite } from "../../../../server/models/Suite";
 import { User } from "../../../../server/models/User";
+import {
+  buildSuiteMembershipQuery,
+  getSuiteMembershipIds,
+  syncUserSuiteState,
+} from "../../../../server/utils/suiteMembership";
 
 async function getOrCreateCurrentUser(session: any) {
   let currentUser = await User.findById(session.user.id);
@@ -19,10 +24,13 @@ async function getOrCreateCurrentUser(session: any) {
       name: session.user.name || "SuiteEase User",
       email: session.user.email || undefined,
       image: session.user.image || null,
+      suiteIds: [],
+      activeSuiteId: null,
       onboardingComplete: false,
     });
   }
 
+  await syncUserSuiteState(currentUser);
   return currentUser;
 }
 
@@ -49,19 +57,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Suite code not found" }, { status: 404 });
     }
 
-    const previousSuiteId = currentUser.suiteId ? String(currentUser.suiteId) : null;
     const nextSuiteId = String(suite._id);
+    const nextMembershipIds = new Set(getSuiteMembershipIds(currentUser));
+    nextMembershipIds.add(nextSuiteId);
 
-    if (
-      previousSuiteId &&
-      previousSuiteId !== nextSuiteId &&
-      Types.ObjectId.isValid(previousSuiteId)
-    ) {
-      await Suite.findByIdAndUpdate(previousSuiteId, {
-        $pull: { memberIds: currentUser._id },
-      });
-    }
-
+    currentUser.suiteIds = [...nextMembershipIds].map((suiteId) =>
+      Types.ObjectId.isValid(suiteId) ? new Types.ObjectId(suiteId) : suiteId
+    );
+    currentUser.activeSuiteId = suite._id;
     currentUser.suiteId = suite._id;
     currentUser.onboardingComplete = true;
     await currentUser.save();
@@ -71,7 +74,7 @@ export async function POST(request: NextRequest) {
     });
 
     const refreshedSuite = await Suite.findById(suite._id).lean();
-    const members = await User.find({ suiteId: suite._id }).lean();
+    const members = await User.find(buildSuiteMembershipQuery(String(suite._id))).lean();
     return NextResponse.json({
       ...(refreshedSuite as any),
       _id: String(suite._id),
@@ -83,6 +86,8 @@ export async function POST(request: NextRequest) {
         ...member,
         _id: String(member._id),
         suiteId: member.suiteId ? String(member.suiteId) : member.suiteId,
+        activeSuiteId: member.activeSuiteId ? String(member.activeSuiteId) : member.activeSuiteId,
+        suiteIds: (member.suiteIds || []).map((memberSuiteId: any) => String(memberSuiteId)),
       })),
     });
   } catch (error) {

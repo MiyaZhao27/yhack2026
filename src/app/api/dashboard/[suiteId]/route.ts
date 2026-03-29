@@ -6,6 +6,7 @@ import { Task } from "../../../../server/models/Task";
 import { getFairnessSummary, getSuiteBalances } from "../../../../server/services/balanceService";
 import { getSessionUserContext } from "../../../../server/utils/sessionUser";
 import { isSameDay, normalizeTaskStatus } from "../../../../server/utils/date";
+import { userHasSuiteAccess } from "../../../../server/utils/suiteMembership";
 
 export async function GET(_request: Request, context: { params: Promise<{ suiteId: string }> }) {
   await connectDatabase();
@@ -16,7 +17,7 @@ export async function GET(_request: Request, context: { params: Promise<{ suiteI
   }
 
   const { suiteId } = await context.params;
-  if (suiteId !== currentUser.suiteId) {
+  if (!userHasSuiteAccess(currentUser, suiteId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -36,6 +37,8 @@ export async function GET(_request: Request, context: { params: Promise<{ suiteI
   const typedExpenses = expenses as any[];
 
   const today = new Date();
+  const sevenDaysFromNow = new Date(today);
+  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
   const normalizedTasks = typedTasks.map((task: any) => ({
     ...task,
     status: normalizeTaskStatus(new Date(task.dueDate), task.status),
@@ -46,6 +49,11 @@ export async function GET(_request: Request, context: { params: Promise<{ suiteI
       (task: any) => task.status !== "done" && isSameDay(new Date(task.dueDate), today)
     ),
     overdue: normalizedTasks.filter((task: any) => task.status === "overdue"),
+    upcoming: normalizedTasks.filter((task: any) => {
+      if (task.status === "done" || task.status === "overdue") return false;
+      const dueDate = new Date(task.dueDate);
+      return dueDate > today && dueDate <= sevenDaysFromNow;
+    }),
     recentExpenses: typedExpenses,
     balances: balanceData.balances,
     settleUps: balanceData.settleUps,
