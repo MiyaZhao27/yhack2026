@@ -24,6 +24,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const showSuiteDetails = status === "authenticated" && !!session?.user;
 
+  if (pathname === "/login" || pathname === "/onboarding") {
+    return <>{children}</>;
+  }
+
   return (
     <div className="app-shell">
       <header className="glass-card mb-6 overflow-hidden">

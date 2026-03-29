@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 
 import { SectionCard } from "../components/SectionCard";
 import { useSuite } from "../context/SuiteContext";
@@ -112,6 +112,15 @@ export function SetupPage() {
           <p>
             Once everyone has joined, you can start tracking chores, shopping, and shared expenses together.
           </p>
+        </div>
+        <div className="mt-6 border-t border-slate-100 pt-6">
+          <button
+            className="button-secondary w-full"
+            type="button"
+            onClick={() => signOut({ callbackUrl: "/login" })}
+          >
+            Sign out
+          </button>
         </div>
       </SectionCard>
     </div>

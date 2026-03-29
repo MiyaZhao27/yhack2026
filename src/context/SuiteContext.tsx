@@ -9,6 +9,8 @@ import {
   useState,
 } from "react";
 
+import { useSession } from "next-auth/react";
+
 import { api } from "../lib/api/client";
 import { Member, Suite } from "../types";
 
@@ -31,6 +33,7 @@ const SuiteContext = createContext<SuiteContextValue | undefined>(undefined);
 const STORAGE_KEY = "livewell-suite-id";
 
 export function SuiteProvider({ children }: { children: ReactNode }) {
+  const { data: session } = useSession();
   const [suite, setSuite] = useState<Suite | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,8 +83,9 @@ export function SuiteProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    void refreshSuite();
-  }, []);
+    const sessionSuiteId = session?.user?.suiteId ?? undefined;
+    void refreshSuite(sessionSuiteId);
+  }, [session?.user?.suiteId]);
 
   const value = useMemo(
     () => ({ suite, members, loading, refreshSuite, createSuite, joinSuite }),
