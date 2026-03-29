@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import { EmptyState } from "../components/EmptyState";
 import { SectionCard } from "../components/SectionCard";
 import { useSuite } from "../context/SuiteContext";
-import { formatCurrency, formatDate } from "../lib/format";
+import { formatCurrency, formatDate, formatDateTime } from "../lib/format";
 import { Balance, Expense } from "../types";
 
 interface ExpenseResponse {
@@ -171,7 +171,7 @@ export function FinancePage() {
                   <div>
                     <p className="font-semibold text-slate-900">{expense.title}</p>
                     <p className="text-sm text-slate-500">
-                      Paid by {nameFor(expense.paidBy)} • {formatDate(expense.createdAt)}
+                      Paid by {nameFor(expense.paidBy)} • {formatDateTime(expense.createdAt)}
                     </p>
                   </div>
                   <p className="text-lg font-semibold text-slate-900">{formatCurrency(expense.amount)}</p>
