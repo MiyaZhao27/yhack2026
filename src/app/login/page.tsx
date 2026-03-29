@@ -197,6 +197,24 @@ export default function LoginPage() {
                     Continue with Google
                   </button>
 
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px" style={{ background: "#e8d5d8" }} />
+                    <span className="text-xs" style={{ color: "#b09aa0" }}>or</span>
+                    <div className="flex-1 h-px" style={{ background: "#e8d5d8" }} />
+                  </div>
+
+                  <button
+                    onClick={() => signIn("credentials", { type: "guest", callbackUrl: "/dashboard" })}
+                    className="w-full flex items-center justify-center gap-3 py-4 rounded-xl font-semibold transition active:scale-95 hover:opacity-90"
+                    style={{
+                      background: "linear-gradient(135deg, #f4e2ff 0%, #ffd9e0 100%)",
+                      border: "1px solid #dcbfc4",
+                      color: "#6b002e",
+                    }}
+                  >
+                    Try as Guest
+                  </button>
+
                   <p className="text-center text-xs" style={{ color: "#897175" }}>
                     By signing in you agree to our terms of service
                   </p>

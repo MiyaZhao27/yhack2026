@@ -1,14 +1,32 @@
 import type { NextAuthOptions } from "next-auth";
+import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 
 import { connectDatabase } from "./server/config/db";
 import { User } from "./server/models/User";
 import { GOOGLE_TASKS_SCOPE } from "./server/services/googleTasksService";
+import { ensureGuestSeedData } from "./server/utils/guestSeed";
 import { getResolvedActiveSuiteId, getSuiteMembershipIds, syncUserSuiteState } from "./server/utils/suiteMembership";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
   providers: [
+    Credentials({
+      credentials: {
+        type: { label: "Type", type: "text" },
+      },
+      async authorize(credentials) {
+        if (credentials?.type !== "guest") return null;
+        await connectDatabase();
+        const guestUser = await ensureGuestSeedData();
+        return {
+          id: String(guestUser._id),
+          name: guestUser.name,
+          email: guestUser.email ?? null,
+          image: guestUser.image ?? null,
+        };
+      },
+    }),
     Google({
       clientId: process.env.AUTH_GOOGLE_ID || "",
       clientSecret: process.env.AUTH_GOOGLE_SECRET || "",
@@ -32,6 +50,7 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user, account }) {
+      if (account?.provider === "credentials") return true;
       if (!user.email || !account?.providerAccountId) return false;
 
       await connectDatabase();
