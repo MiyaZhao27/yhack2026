@@ -16,7 +16,7 @@ interface BalanceMember {
   outstandingNet: number;
 }
 
-export async function getSuiteBalances(suiteId: string) {
+export async function getSuiteBalances(suiteId: string, userId?: string) {
   const [members, expenses, settlements] = (await Promise.all([
     User.find({ suiteId }).lean(),
     Expense.find({ suiteId }).lean(),
@@ -140,7 +140,7 @@ export async function getSuiteBalances(suiteId: string) {
     }
   }
 
-  // Per-member outstanding positions from true remaining pairwise obligations
+  // Per-member outstanding positions from direct remaining obligations
   for (const [memberId, member] of balances) {
     let outstandingOwed = 0;
     for (const [, amt] of remaining.get(memberId) ?? new Map()) {
@@ -190,7 +190,11 @@ export async function getSuiteBalances(suiteId: string) {
     }
   }
 
-  return { balances: balanceRows, settleUps };
+  const filteredSettleUps = userId
+    ? settleUps.filter((s) => s.fromId === userId || s.toId === userId)
+    : settleUps;
+
+  return { balances: balanceRows, settleUps: filteredSettleUps };
 }
 
 export async function getFairnessSummary(suiteId: string) {
