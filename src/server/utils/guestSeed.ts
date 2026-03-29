@@ -13,7 +13,7 @@ export async function ensureGuestSeedData() {
   // Find or create the primary guest user
   let guestUser = await User.findOne({ email: GUEST_EMAIL });
 
-  if (guestUser && guestUser.onboardingComplete) {
+  if (guestUser) {
     return guestUser;
   }
 
@@ -53,7 +53,6 @@ export async function ensureGuestSeedData() {
   }
 
   const suiteId = suite._id as Types.ObjectId;
-  const suiteIdStr = String(suiteId);
 
   // Ensure all members are in the suite
   const memberIds = [String(alex._id), String(jordan._id)];
@@ -81,13 +80,8 @@ export async function ensureGuestSeedData() {
       image: null,
       suiteIds: [suiteId],
       activeSuiteId: suiteId,
-      onboardingComplete: true,
+      onboardingComplete: false,
     });
-  } else {
-    guestUser.suiteIds = [suiteId];
-    guestUser.activeSuiteId = suiteId;
-    guestUser.onboardingComplete = true;
-    await guestUser.save();
   }
 
   // Add guest to suite

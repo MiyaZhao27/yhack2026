@@ -204,7 +204,7 @@ export default function LoginPage() {
                   </div>
 
                   <button
-                    onClick={() => signIn("credentials", { type: "guest", callbackUrl: "/dashboard" })}
+                    onClick={() => signIn("credentials", { type: "guest", callbackUrl: "/onboarding" })}
                     className="w-full flex items-center justify-center gap-3 py-4 rounded-xl font-semibold transition active:scale-95 hover:opacity-90"
                     style={{
                       background: "linear-gradient(135deg, #f4e2ff 0%, #ffd9e0 100%)",
