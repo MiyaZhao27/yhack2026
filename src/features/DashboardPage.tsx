@@ -13,7 +13,7 @@ import { DashboardData } from "../types";
 export function DashboardPage() {
   const { suite, members } = useSuite();
   const [data, setData] = useState<DashboardData | null>(null);
-  const { status } = useSession();
+  const { data: session, status } = useSession();
 
   useEffect(() => {
     if (!suite?._id || status !== "authenticated") {
@@ -32,6 +32,10 @@ export function DashboardPage() {
   }
 
   const nameFor = (id: string) => members.find((member) => member._id === id)?.name || "Unknown";
+  const currentUserId = session?.user?.id ?? "";
+  const myDueToday = (data?.dueToday || []).filter((task) => task.assigneeId === currentUserId);
+  const myOverdue = (data?.overdue || []).filter((task) => task.assigneeId === currentUserId);
+  const myUrgentTasks = [...myDueToday, ...myOverdue].slice(0, 6);
 
   return (
     <div className="space-y-6">
@@ -43,7 +47,7 @@ export function DashboardPage() {
         <div className="relative z-0">
           <SectionCard title="My Tasks">
             <div className="space-y-3">
-              {[...(data?.dueToday || []), ...(data?.overdue || [])].slice(0, 6).map((task) => (
+              {myUrgentTasks.map((task) => (
                 <div key={task._id} className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
                   <div>
                     <p className="font-medium text-slate-900">{task.title}</p>
@@ -56,20 +60,20 @@ export function DashboardPage() {
                   </span>
                 </div>
               ))}
-              {!data?.dueToday.length && !data?.overdue.length ? (
+              {!myDueToday.length && !myOverdue.length ? (
                 <EmptyState label="No urgent tasks. The suite is in good shape." />
               ) : null}
-              {!!data?.dueToday.length && !data?.overdue.length ? (
+              {!!myDueToday.length && !myOverdue.length ? (
                 <div className="rounded-2xl bg-sky-50 p-4 text-sm text-sky-800">
                   Today is under control. Nothing is currently overdue.
                 </div>
               ) : null}
-              {!data?.dueToday.length && !!data?.overdue.length ? (
+              {!myDueToday.length && !!myOverdue.length ? (
                 <div className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-800">
                   Overdue chores need attention first before new tasks stack up.
                 </div>
               ) : null}
-              {!!data?.dueToday.length && !!data?.overdue.length ? (
+              {!!myDueToday.length && !!myOverdue.length ? (
                 <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-800">
                   A mix of due-today and overdue work is active, so this is the fastest place to recover the suite.
                 </div>
