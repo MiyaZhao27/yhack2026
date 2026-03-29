@@ -2,7 +2,7 @@
 
 import { ReactNode } from "react";
 
-import { Home, Receipt, ShoppingBasket, Sparkles, Wrench } from "lucide-react";
+import { Home, LogIn, Receipt, ShoppingBasket, Sparkles, Wrench } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -14,6 +14,7 @@ const navItems = [
   { href: "/shopping", label: "Shopping", icon: ShoppingBasket },
   { href: "/finance", label: "Finance", icon: Receipt },
   { href: "/setup", label: "Setup", icon: Sparkles },
+  { href: "/login", label: "Login", icon: LogIn },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {

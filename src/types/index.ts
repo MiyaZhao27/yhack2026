@@ -2,12 +2,14 @@ export interface Member {
   _id: string;
   name: string;
   suiteId: string;
+  email?: string;
 }
 
 export interface Suite {
   _id: string;
   name: string;
   memberIds: string[];
+  inviteCode?: string;
   members?: Member[];
 }
 
@@ -33,23 +35,64 @@ export interface ShoppingItem {
   boughtBy?: string | null;
 }
 
+export type SplitMethod = "equal" | "exact" | "percentage" | "itemized";
+
+export interface ExpenseSplit {
+  participantId: string;
+  owedAmount: number;
+  percentage?: number;
+}
+
+export interface ExpenseItem {
+  name: string;
+  amount: number;
+  assignedParticipants: string[];
+}
+
 export interface Expense {
   _id: string;
   suiteId: string;
   title: string;
   amount: number;
   paidBy: string;
+  date?: string;
   participants: string[];
-  splitType: "equal";
+  splitMethod: SplitMethod;
+  splits: ExpenseSplit[];
+  items: ExpenseItem[];
+  createdAt: string;
+}
+
+export interface SettlementAllocation {
+  expenseId: string;
+  debtorId: string;
+  creditorId: string;
+  amount: number;
+}
+
+export interface Settlement {
+  _id: string;
+  suiteId: string;
+  payerId: string;
+  receiverId: string;
+  amount: number;
+  date: string;
+  note: string;
+  status: "confirmed";
+  allocations: SettlementAllocation[];
   createdAt: string;
 }
 
 export interface Balance {
   userId: string;
   name: string;
-  net: number;
-  paid: number;
-  owed: number;
+  paid: number;          // total fronted as expense payer
+  owed: number;          // gross from expense splits
+  net: number;           // paid - owed (theoretical)
+  settledOut: number;    // total paid via recorded settlements
+  settledIn: number;     // total received via recorded settlements
+  outstanding: number;   // what this person still owes to others (after settlements)
+  outstandingNet: number; // outstandingReceivable - outstanding
 }
 
 export interface FairnessRow {
@@ -66,6 +109,6 @@ export interface DashboardData {
   shoppingNeeded: ShoppingItem[];
   recentExpenses: Expense[];
   balances: Balance[];
-  settleUps: { from: string; to: string; amount: number }[];
+  settleUps: { from: string; fromId?: string; to: string; toId?: string; amount: number }[];
   fairness: FairnessRow[];
 }

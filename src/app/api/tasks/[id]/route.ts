@@ -12,7 +12,11 @@ export async function PATCH(
 
   const { id } = await context.params;
   const payload = await request.json();
-  const status = normalizeTaskStatus(new Date(payload.dueDate), payload.status);
+  const existing = await Task.findById(id).lean();
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const dueDate = payload.dueDate ? new Date(payload.dueDate) : (existing as any).dueDate;
+  const status = normalizeTaskStatus(dueDate, payload.status ?? (existing as any).status);
   const task = await Task.findByIdAndUpdate(
     id,
     {
