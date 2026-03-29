@@ -6,7 +6,7 @@ import { Providers } from "../components/Providers";
 import "../index.css";
 
 export const metadata: Metadata = {
-  title: "LiveWell",
+  title: "SuiteEase",
   description: "Manage chores, shared notes, and spending in one calm, demo-ready space.",
 };
 

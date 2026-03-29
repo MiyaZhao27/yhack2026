@@ -205,7 +205,7 @@ export function TasksPage({ currentUser }: TasksPageProps) {
 
   return (
     <div className="space-y-6">
-      <SectionCard title="Task Calendar" subtitle="LiveWell recurring tasks and synced Google Tasks in a monthly view">
+      <SectionCard title="Task Calendar" subtitle="SuiteEase recurring tasks and synced Google Tasks in a monthly view">
         {googleTasksError ? <div className="mb-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800">{googleTasksError}</div> : null}
         <div className="mb-4 flex items-center justify-between gap-3">
           <button

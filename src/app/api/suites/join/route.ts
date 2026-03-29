@@ -16,7 +16,7 @@ async function getOrCreateCurrentUser(session: any) {
 
   if (!currentUser) {
     currentUser = await User.create({
-      name: session.user.name || "LiveWell User",
+      name: session.user.name || "SuiteEase User",
       email: session.user.email || undefined,
       image: session.user.image || null,
       onboardingComplete: false,

@@ -1,4 +1,4 @@
-# LiveWell
+# SuiteEase
 
 ### Run With Atlas
 ```bash
