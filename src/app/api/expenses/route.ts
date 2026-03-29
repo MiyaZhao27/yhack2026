@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDatabase } from "../../../server/config/db";
 import { Expense } from "../../../server/models/Expense";
 import { getSuiteBalances } from "../../../server/services/balanceService";
+import { recomputeNetting } from "../../../server/services/settlementService";
 import {
   computeEqualSplits,
   computeExactSplits,
@@ -62,6 +63,7 @@ export async function POST(request: NextRequest) {
     date: date ? new Date(date) : new Date(),
   });
 
+  await recomputeNetting(String(expense.suiteId));
   const balanceData = await getSuiteBalances(String(expense.suiteId));
   return NextResponse.json({ expense, ...balanceData }, { status: 201 });
 }

@@ -7,7 +7,7 @@ import { api } from "../lib/api/client";
 import { EmptyState } from "../components/EmptyState";
 import { SectionCard } from "../components/SectionCard";
 import { useSuite } from "../context/SuiteContext";
-import { formatCurrency, formatDate } from "../lib/ui/format";
+import { formatCurrency, formatDateTime } from "../lib/ui/format";
 import { AddExpenseModal } from "./finance/AddExpenseModal";
 import { EditExpenseModal } from "./finance/EditExpenseModal";
 import { RecordPaymentModal } from "./finance/RecordPaymentModal";
@@ -26,7 +26,6 @@ export function FinancePage() {
   const [paymentPrefill, setPaymentPrefill] = useState<
     { payerId?: string; receiverId?: string; amount?: number } | undefined
   >();
-  const [settleUpView, setSettleUpView] = useState<"net" | "per-expense">("net");
   const [expandedExpenses, setExpandedExpenses] = useState<Set<string>>(new Set());
   const [expandedSettlements, setExpandedSettlements] = useState<Set<string>>(new Set());
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -50,7 +49,7 @@ export function FinancePage() {
     void loadAll();
   }, [suite?._id]);
 
-  // Build splitAllocations: Map<expenseId, Map<debtorId, coveredAmount>>
+  // For each expense: Map<expenseId, Map<debtorId, settledAmount>>
   const splitAllocations = useMemo(() => {
     const map = new Map<string, Map<string, number>>();
     for (const s of settlements) {
@@ -84,7 +83,6 @@ export function FinancePage() {
 
   const filteredExpenses = useMemo(() => {
     return expenses.filter((e) => {
-      // Period filter
       if (filterPeriod !== "all") {
         const expDate = new Date(e.date ?? e.createdAt);
         const now = new Date();
@@ -98,28 +96,21 @@ export function FinancePage() {
           if (expDate < monthAgo) return false;
         }
       }
-      // User filter (paidBy OR participant)
       if (filterUser) {
-        const inParticipants = e.participants.includes(filterUser);
-        const isPayer = e.paidBy === filterUser;
-        if (!inParticipants && !isPayer) return false;
+        if (!e.participants.includes(filterUser) && e.paidBy !== filterUser) return false;
       }
       return true;
     });
   }, [expenses, filterPeriod, filterUser]);
 
   const handleDeleteExpense = async (id: string) => {
-    const data = await api.delete<{ balances: Balance[]; settleUps: SettleUp[] }>(`/expenses/${id}`);
-    setExpenses((prev) => prev.filter((e) => e._id !== id));
-    setBalances(data.balances);
-    setSettleUps(data.settleUps);
+    await api.delete(`/expenses/${id}`);
+    await loadAll();
   };
 
   const handleDeleteSettlement = async (id: string) => {
-    const data = await api.delete<{ balances: Balance[]; settleUps: SettleUp[] }>(`/settlements/${id}`);
-    setSettlements((prev) => prev.filter((s) => s._id !== id));
-    setBalances(data.balances);
-    setSettleUps(data.settleUps);
+    await api.delete(`/settlements/${id}`);
+    await loadAll();
   };
 
   const openPayment = (prefill?: { payerId?: string; receiverId?: string; amount?: number }) => {
@@ -133,13 +124,9 @@ export function FinancePage() {
         <EditExpenseModal
           expense={editingExpense}
           members={members}
-          onSuccess={(updatedExpense, newBalances, newSettleUps) => {
-            setExpenses((prev) =>
-              prev.map((e) => (e._id === updatedExpense._id ? updatedExpense : e))
-            );
-            setBalances(newBalances);
-            setSettleUps(newSettleUps as SettleUp[]);
+          onSuccess={() => {
             setEditingExpense(null);
+            void loadAll();
           }}
           onClose={() => setEditingExpense(null)}
         />
@@ -148,11 +135,9 @@ export function FinancePage() {
         <AddExpenseModal
           members={members}
           suiteId={suite._id}
-          onSuccess={(expense, newBalances, newSettleUps) => {
-            setExpenses((prev) => [expense, ...prev]);
-            setBalances(newBalances);
-            setSettleUps(newSettleUps as SettleUp[]);
+          onSuccess={() => {
             setShowAddExpense(false);
+            void loadAll();
           }}
           onClose={() => setShowAddExpense(false)}
         />
@@ -162,11 +147,9 @@ export function FinancePage() {
           members={members}
           suiteId={suite._id}
           prefill={paymentPrefill}
-          onSuccess={(settlement, newBalances, newSettleUps) => {
-            setSettlements((prev) => [settlement, ...prev]);
-            setBalances(newBalances);
-            setSettleUps(newSettleUps);
+          onSuccess={() => {
             setShowPayment(false);
+            void loadAll();
           }}
           onClose={() => setShowPayment(false)}
         />
@@ -174,147 +157,98 @@ export function FinancePage() {
 
       <div className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-          {/* Left column: Balances + Settle-Up */}
+
+          {/* Left column: Balances + Settle Up */}
           <div className="space-y-6">
-            <SectionCard title="Balances" subtitle="Outstanding after settlements">
+
+            {/* Balances */}
+            <SectionCard title="Balances" subtitle="Current outstanding after settlements">
               <div className="space-y-3">
-                {balances.map((b) => (
-                  <div key={b.userId} className="rounded-2xl bg-slate-50 p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-slate-900">{b.name}</p>
-                      <span
-                        className={`pill ${
-                          b.outstandingNet >= 0
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-rose-100 text-rose-700"
-                        }`}
-                      >
-                        {b.outstandingNet >= 0 ? "+" : ""}
-                        {formatCurrency(b.outstandingNet)}
-                      </span>
+                {balances.map((b) => {
+                  // outstandingNet > 0: net creditor (others owe you)
+                  // outstandingNet < 0: net debtor (you owe others)
+                  // outstanding: total you still owe others
+                  // outstanding + outstandingNet: total others still owe you
+                  const amountOwedToYou = Number((b.outstanding + b.outstandingNet).toFixed(2));
+                  const isOwed = b.outstandingNet > 0.005;
+                  const isOwing = b.outstandingNet < -0.005;
+                  return (
+                    <div key={b.userId} className="rounded-2xl bg-slate-50 p-4">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-slate-900">{b.name}</p>
+                        <span
+                          className={`pill ${
+                            isOwed
+                              ? "bg-emerald-100 text-emerald-800"
+                              : isOwing
+                                ? "bg-rose-100 text-rose-700"
+                                : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {isOwed
+                            ? `Owed ${formatCurrency(b.outstandingNet)}`
+                            : isOwing
+                              ? `Owes ${formatCurrency(-b.outstandingNet)}`
+                              : "Settled up"}
+                        </span>
+                      </div>
+                      {(amountOwedToYou > 0.005 || b.outstanding > 0.005) && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          {amountOwedToYou > 0.005
+                            ? `Others owe ${formatCurrency(amountOwedToYou)}`
+                            : ""}
+                          {amountOwedToYou > 0.005 && b.outstanding > 0.005 ? " · " : ""}
+                          {b.outstanding > 0.005
+                            ? `Owes others ${formatCurrency(b.outstanding)}`
+                            : ""}
+                        </p>
+                      )}
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Paid {formatCurrency(b.paid)} · Owes {formatCurrency(b.owed)} · Settled out{" "}
-                      {formatCurrency(b.settledOut)}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
                 {!balances.length && <EmptyState label="No members yet." />}
               </div>
             </SectionCard>
 
+            {/* Settle Up */}
             <SectionCard
               title="Settle Up"
               subtitle="Suggested payments to clear balances"
               action={
-                <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
-                  {(["net", "per-expense"] as const).map((v) => (
-                    <button
-                      key={v}
-                      className={`rounded-lg px-3 py-1 text-xs font-medium transition ${
-                        settleUpView === v ? "bg-white shadow-sm text-slate-900" : "text-slate-500"
-                      }`}
-                      onClick={() => setSettleUpView(v)}
-                    >
-                      {v === "net" ? "Net" : "Per Expense"}
-                    </button>
-                  ))}
-                </div>
+                <button
+                  className="button-primary flex items-center gap-1 text-sm"
+                  onClick={() => openPayment()}
+                >
+                  <Plus size={15} /> Record Payment
+                </button>
               }
             >
-              {settleUpView === "net" ? (
-                <div className="space-y-3">
-                  {settleUps.map((s, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between rounded-2xl bg-emerald-50 p-4"
+              <div className="space-y-3">
+                {settleUps.map((s, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between rounded-2xl bg-emerald-50 p-4"
+                  >
+                    <p className="text-sm text-emerald-900">
+                      <span className="font-semibold">{s.from}</span> pays{" "}
+                      <span className="font-semibold">{s.to}</span>
+                      <span className="ml-2 font-semibold">{formatCurrency(s.amount)}</span>
+                    </p>
+                    <button
+                      className="button-secondary text-xs"
+                      onClick={() =>
+                        openPayment({ payerId: s.fromId, receiverId: s.toId, amount: s.amount })
+                      }
                     >
-                      <p className="text-sm text-emerald-900">
-                        <span className="font-semibold">{s.from}</span> pays{" "}
-                        <span className="font-semibold">{s.to}</span>
-                        <span className="ml-2 font-semibold">{formatCurrency(s.amount)}</span>
-                      </p>
-                      <button
-                        className="button-secondary text-xs"
-                        onClick={() =>
-                          openPayment({ payerId: s.fromId, receiverId: s.toId, amount: s.amount })
-                        }
-                      >
-                        Record
-                      </button>
-                    </div>
-                  ))}
-                  {!settleUps.length && <EmptyState label="All settled up!" />}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {filteredExpenses.map((expense) => {
-                    const nonPayerSplits = expense.splits.filter(
-                      (sp) => sp.participantId !== expense.paidBy
-                    );
-                    const anyRemaining = nonPayerSplits.some((sp) => {
-                      const covered =
-                        splitAllocations.get(expense._id)?.get(sp.participantId) ?? 0;
-                      return sp.owedAmount - covered > 0.005;
-                    });
-                    if (!anyRemaining) return null;
-                    return (
-                      <div key={expense._id} className="rounded-2xl bg-slate-50 p-4">
-                        <p className="mb-2 font-semibold text-slate-900">
-                          {expense.title} — {formatCurrency(expense.amount)}
-                        </p>
-                        <div className="space-y-2">
-                          {nonPayerSplits.map((sp) => {
-                            const covered =
-                              splitAllocations.get(expense._id)?.get(sp.participantId) ?? 0;
-                            const remaining = Math.max(0, sp.owedAmount - covered);
-                            if (remaining < 0.005) return null;
-                            return (
-                              <div
-                                key={sp.participantId}
-                                className="flex items-center justify-between text-sm"
-                              >
-                                <span className="text-slate-700">
-                                  {nameFor(sp.participantId)} owes {nameFor(expense.paidBy)}
-                                  <span className="ml-2 font-medium text-rose-600">
-                                    {formatCurrency(remaining)}
-                                  </span>
-                                  {covered > 0 && (
-                                    <span className="ml-1 text-xs text-slate-400">
-                                      (of {formatCurrency(sp.owedAmount)})
-                                    </span>
-                                  )}
-                                </span>
-                                <button
-                                  className="button-secondary text-xs"
-                                  onClick={() =>
-                                    openPayment({
-                                      payerId: sp.participantId,
-                                      receiverId: expense.paidBy,
-                                      amount: remaining,
-                                    })
-                                  }
-                                >
-                                  Record
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {filteredExpenses.every((expense) =>
-                    expense.splits
-                      .filter((sp) => sp.participantId !== expense.paidBy)
-                      .every((sp) => {
-                        const covered =
-                          splitAllocations.get(expense._id)?.get(sp.participantId) ?? 0;
-                        return sp.owedAmount - covered <= 0.005;
-                      })
-                  ) && <EmptyState label="All expenses settled up!" />}
-                </div>
-              )}
+                      Record
+                    </button>
+                  </div>
+                ))}
+                {!settleUps.length && <EmptyState label="All settled up!" />}
+                <p className="text-xs text-slate-400">
+                  Suggestions from direct payer-to-payee obligations · Payments applied FIFO to oldest obligations
+                </p>
+              </div>
             </SectionCard>
           </div>
 
@@ -373,6 +307,8 @@ export function FinancePage() {
             <div className="space-y-3">
               {filteredExpenses.map((expense) => {
                 const isExpanded = expandedExpenses.has(expense._id);
+                const expAllocMap = splitAllocations.get(expense._id) ?? new Map<string, number>();
+
                 return (
                   <div key={expense._id} className="rounded-2xl bg-slate-50">
                     <div
@@ -385,7 +321,7 @@ export function FinancePage() {
                       <div className="flex-1">
                         <p className="font-semibold text-slate-900">{expense.title}</p>
                         <p className="text-xs text-slate-500">
-                          Paid by {nameFor(expense.paidBy)} · {formatDate(expense.createdAt)}
+                          Paid by {nameFor(expense.paidBy)} · {formatDateTime(expense.date ?? expense.createdAt)}
                         </p>
                       </div>
                       <p className="font-semibold text-slate-900">
@@ -410,59 +346,68 @@ export function FinancePage() {
                         <Trash2 size={15} />
                       </button>
                     </div>
+
                     {isExpanded && (
                       <div className="border-t border-slate-200 px-4 pb-4 pt-3">
                         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
                           Split breakdown
                         </p>
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           {expense.splits.map((sp) => {
-                            const covered =
-                              splitAllocations.get(expense._id)?.get(sp.participantId) ?? 0;
-                            const remaining = Math.max(0, sp.owedAmount - covered);
                             const isPayer = sp.participantId === expense.paidBy;
+                            const settled = expAllocMap.get(sp.participantId) ?? 0;
+                            const remaining = Math.max(0, sp.owedAmount - settled);
+                            const isFullySettled = remaining < 0.005;
+
                             return (
                               <div
                                 key={sp.participantId}
-                                className="flex items-center justify-between text-sm"
+                                className="rounded-lg bg-white px-3 py-2 text-sm"
                               >
-                                <span className="text-slate-700">
-                                  {nameFor(sp.participantId)}
-                                  {isPayer && (
-                                    <span className="ml-1 text-xs text-slate-400">(payer)</span>
-                                  )}
-                                </span>
-                                <div className="flex items-center gap-3">
-                                  <span className="text-slate-500">
-                                    {formatCurrency(sp.owedAmount)}
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-medium text-slate-700">
+                                    {nameFor(sp.participantId)}
+                                    {isPayer && (
+                                      <span className="ml-1 text-xs font-normal text-slate-400">
+                                        (payer)
+                                      </span>
+                                    )}
                                   </span>
-                                  {!isPayer && covered > 0 && (
-                                    <span className="text-xs text-emerald-600">
-                                      −{formatCurrency(covered)}
+                                  {isPayer ? (
+                                    <span className="text-xs text-slate-400">
+                                      Own share: {formatCurrency(sp.owedAmount)}
                                     </span>
-                                  )}
-                                  {!isPayer && (
-                                    <span
-                                      className={`font-medium ${
-                                        remaining < 0.005 ? "text-emerald-600" : "text-rose-600"
-                                      }`}
-                                    >
-                                      {remaining < 0.005 ? "Settled" : formatCurrency(remaining)}
-                                    </span>
-                                  )}
-                                  {!isPayer && remaining > 0.005 && (
-                                    <button
-                                      className="button-secondary text-xs"
-                                      onClick={() =>
-                                        openPayment({
-                                          payerId: sp.participantId,
-                                          receiverId: expense.paidBy,
-                                          amount: remaining,
-                                        })
-                                      }
-                                    >
-                                      Record
-                                    </button>
+                                  ) : (
+                                    <div className="flex items-center gap-3 text-xs">
+                                      <span className="text-slate-500">
+                                        Share:{" "}
+                                        <span className="font-medium text-slate-700">
+                                          {formatCurrency(sp.owedAmount)}
+                                        </span>
+                                      </span>
+                                      <span className="text-emerald-600">
+                                        Settled:{" "}
+                                        <span className="font-medium">
+                                          {formatCurrency(settled)}
+                                        </span>
+                                      </span>
+                                      <span
+                                        className={
+                                          isFullySettled ? "text-slate-400" : "text-rose-600"
+                                        }
+                                      >
+                                        {isFullySettled ? (
+                                          "Paid in full"
+                                        ) : (
+                                          <>
+                                            Remaining:{" "}
+                                            <span className="font-medium">
+                                              {formatCurrency(remaining)}
+                                            </span>
+                                          </>
+                                        )}
+                                      </span>
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -475,7 +420,13 @@ export function FinancePage() {
                 );
               })}
               {!filteredExpenses.length && (
-                <EmptyState label={expenses.length ? "No expenses match the current filters." : "No expenses yet."} />
+                <EmptyState
+                  label={
+                    expenses.length
+                      ? "No expenses match the current filters."
+                      : "No expenses yet."
+                  }
+                />
               )}
             </div>
           </SectionCard>
@@ -484,7 +435,7 @@ export function FinancePage() {
         {/* Settlement History */}
         <SectionCard
           title="Settlement History"
-          subtitle="Recorded payments and their allocations"
+          subtitle="Recorded direct payments"
           action={
             <button
               className="button-primary flex items-center gap-1 text-sm"
@@ -495,67 +446,147 @@ export function FinancePage() {
           }
         >
           <div className="space-y-3">
-            {settlements.map((s) => {
-              const isExpanded = expandedSettlements.has(s._id);
-              return (
-                <div key={s._id} className="rounded-2xl bg-slate-50">
+            {[...settlements]
+              .sort((a, b) => {
+                const tA = new Date(a.date).getTime();
+                const tB = new Date(b.date).getTime();
+                return tB - tA;
+              })
+              .map((s) => {
+                const isExpanded = expandedSettlements.has(s._id);
+                const isNetting = s.type === "netting";
+
+                const settledAllocs = s.allocations?.filter((a) => a.allocationRole === "settled" || !a.allocationRole) ?? [];
+                const offsetAllocs = s.allocations?.filter((a) => a.allocationRole === "offset") ?? [];
+
+                return (
                   <div
-                    className="flex cursor-pointer items-center gap-3 p-4"
-                    onClick={() => toggleSettlement(s._id)}
+                    key={s._id}
+                    className={`rounded-2xl ${isNetting ? "bg-violet-50" : "bg-slate-50"}`}
                   >
-                    <span className="text-slate-400">
-                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </span>
-                    <div className="flex-1">
-                      <p className="font-semibold text-slate-900">
-                        {nameFor(s.payerId)} → {nameFor(s.receiverId)}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {formatDate(s.date)}
-                        {s.note ? ` · ${s.note}` : ""}
-                      </p>
-                    </div>
-                    <p className="font-semibold text-emerald-700">{formatCurrency(s.amount)}</p>
-                    <button
-                      className="text-slate-400 hover:text-rose-500"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleDeleteSettlement(s._id);
-                      }}
+                    <div
+                      className="flex cursor-pointer items-center gap-3 p-4"
+                      onClick={() => toggleSettlement(s._id)}
                     >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                  {isExpanded && (
-                    <div className="border-t border-slate-200 px-4 pb-4 pt-3">
-                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-                        Allocations (FIFO)
-                      </p>
-                      {s.allocations?.length ? (
-                        <div className="space-y-1">
-                          {s.allocations.map((a, i) => {
-                            const expense = expenses.find((e) => e._id === a.expenseId);
-                            return (
-                              <div
-                                key={i}
-                                className="flex items-center justify-between text-sm text-slate-600"
-                              >
-                                <span>{expense?.title ?? "Expense"}</span>
-                                <span className="font-medium text-emerald-700">
-                                  {formatCurrency(a.amount)}
-                                </span>
-                              </div>
-                            );
-                          })}
+                      <span className={isNetting ? "text-violet-400" : "text-slate-400"}>
+                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      </span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-slate-900">
+                            {isNetting
+                              ? `${nameFor(s.payerId)} ↔ ${nameFor(s.receiverId)} netted`
+                              : `${nameFor(s.payerId)} paid ${nameFor(s.receiverId)}`}
+                          </p>
+                          {isNetting && (
+                            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                              Auto-netted
+                            </span>
+                          )}
                         </div>
-                      ) : (
-                        <p className="text-sm text-slate-400">No allocations recorded.</p>
+                        <p className="text-xs text-slate-500">
+                          {formatDateTime(s.date)}
+                          {!isNetting && s.note ? ` · ${s.note}` : ""}
+                        </p>
+                      </div>
+                      <p className={`font-semibold ${isNetting ? "text-violet-700" : "text-emerald-700"}`}>
+                        {formatCurrency(s.amount)}
+                      </p>
+                      {!isNetting && (
+                        <button
+                          className="text-slate-400 hover:text-rose-500"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleDeleteSettlement(s._id);
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                    {isExpanded && (
+                      <div className="border-t border-slate-200 px-4 pb-4 pt-3 space-y-3">
+                        {isNetting ? (
+                          <>
+                            {settledAllocs.length > 0 && (
+                              <div>
+                                <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-violet-500">
+                                  Cleared obligations ({nameFor(s.payerId)})
+                                </p>
+                                <div className="space-y-1">
+                                  {settledAllocs.map((a, i) => {
+                                    const expense = expenses.find((e) => e._id === a.expenseId);
+                                    return (
+                                      <div
+                                        key={i}
+                                        className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm text-slate-600"
+                                      >
+                                        <span>{expense?.title ?? "Expense"}</span>
+                                        <span className="font-medium text-violet-700">
+                                          {formatCurrency(a.amount)}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                            {offsetAllocs.length > 0 && (
+                              <div>
+                                <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-violet-500">
+                                  Offset against ({nameFor(s.receiverId)})
+                                </p>
+                                <div className="space-y-1">
+                                  {offsetAllocs.map((a, i) => {
+                                    const expense = expenses.find((e) => e._id === a.expenseId);
+                                    return (
+                                      <div
+                                        key={i}
+                                        className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm text-slate-600"
+                                      >
+                                        <span>{expense?.title ?? "Expense"}</span>
+                                        <span className="font-medium text-violet-700">
+                                          {formatCurrency(a.amount)}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                              Applied to (FIFO)
+                            </p>
+                            {s.allocations?.length ? (
+                              <div className="space-y-1">
+                                {s.allocations.map((a, i) => {
+                                  const expense = expenses.find((e) => e._id === a.expenseId);
+                                  return (
+                                    <div
+                                      key={i}
+                                      className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm text-slate-600"
+                                    >
+                                      <span>{expense?.title ?? "Expense"}</span>
+                                      <span className="font-medium text-emerald-700">
+                                        {formatCurrency(a.amount)}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-slate-400">No allocations recorded.</p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             {!settlements.length && (
               <EmptyState label="No settlement payments recorded yet." />
             )}

@@ -6,6 +6,10 @@ const allocationSchema = new Schema(
     debtorId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     creditorId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     amount: { type: Number, required: true, min: 0 },
+    // "settled": this allocation closes the smaller-side obligation (netting only)
+    // "offset":  this allocation reduces the larger-side obligation (netting only)
+    // null/undefined: plain payment allocation
+    allocationRole: { type: String, enum: ["settled", "offset"], default: null },
   },
   { _id: false }
 );
@@ -19,6 +23,8 @@ const settlementSchema = new Schema(
     date: { type: Date, default: Date.now },
     note: { type: String, trim: true, default: "" },
     status: { type: String, enum: ["confirmed"], default: "confirmed" },
+    // "payment" = real cash transfer; "netting" = auto-generated bilateral offset
+    type: { type: String, enum: ["payment", "netting"], default: "payment" },
     allocations: [allocationSchema],
   },
   { timestamps: true, versionKey: false }

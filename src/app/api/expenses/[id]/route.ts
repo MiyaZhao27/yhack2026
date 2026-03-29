@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDatabase } from "../../../../server/config/db";
 import { Expense } from "../../../../server/models/Expense";
 import { getSuiteBalances } from "../../../../server/services/balanceService";
+import { recomputeNetting } from "../../../../server/services/settlementService";
 import {
   computeEqualSplits,
   computeExactSplits,
@@ -63,6 +64,7 @@ export async function PATCH(
 
   if (!expense) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  await recomputeNetting(String((expense as any).suiteId));
   const balanceData = await getSuiteBalances(String((expense as any).suiteId));
   return NextResponse.json({ expense, ...balanceData });
 }
@@ -77,6 +79,7 @@ export async function DELETE(
   const expense = (await Expense.findByIdAndDelete(id).lean()) as any;
   if (!expense) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  await recomputeNetting(String(expense.suiteId));
   const balanceData = await getSuiteBalances(String(expense.suiteId));
   return NextResponse.json(balanceData);
 }

@@ -68,6 +68,7 @@ export interface SettlementAllocation {
   debtorId: string;
   creditorId: string;
   amount: number;
+  allocationRole?: "settled" | "offset" | null;
 }
 
 export interface Settlement {
@@ -79,6 +80,7 @@ export interface Settlement {
   date: string;
   note: string;
   status: "confirmed";
+  type?: "payment" | "netting";
   allocations: SettlementAllocation[];
   createdAt: string;
 }

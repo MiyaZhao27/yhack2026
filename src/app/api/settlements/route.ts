@@ -3,12 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDatabase } from "../../../server/config/db";
 import { Settlement } from "../../../server/models/Settlement";
 import { getSuiteBalances } from "../../../server/services/balanceService";
-import { createSettlement } from "../../../server/services/settlementService";
+import { createSettlement, recomputeNetting } from "../../../server/services/settlementService";
 
 export async function GET(request: NextRequest) {
   await connectDatabase();
   const suiteId = request.nextUrl.searchParams.get("suiteId");
-  const settlements = await Settlement.find(suiteId ? { suiteId } : {})
+  const settlements = await Settlement.find(suiteId ? { suiteId, type: "payment" } : { type: "payment" })
     .sort({ date: -1 })
     .lean();
   return NextResponse.json(settlements);
@@ -29,15 +29,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Amount must be positive" }, { status: 400 });
   }
 
-  const settlement = await createSettlement({
-    suiteId,
-    payerId,
-    receiverId,
-    amount: Number(amount),
-    date: date ? new Date(date) : new Date(),
-    note: note ?? undefined,
-  });
+  let settlement;
+  try {
+    settlement = await createSettlement({
+      suiteId,
+      payerId,
+      receiverId,
+      amount: Number(amount),
+      date: date ? new Date(date) : new Date(),
+      note: note ?? undefined,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message ?? "Failed to record payment" }, { status: 400 });
+  }
 
+  await recomputeNetting(suiteId);
   const balanceData = await getSuiteBalances(suiteId);
   return NextResponse.json({ settlement, ...balanceData }, { status: 201 });
 }

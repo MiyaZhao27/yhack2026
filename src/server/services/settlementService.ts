@@ -6,12 +6,14 @@ interface AllocationEntry {
   debtorId: string;
   creditorId: string;
   amount: number;
+  allocationRole?: "settled" | "offset" | null;
 }
 
 /**
- * Records a net settlement payment from payerId → receiverId.
- * Automatically allocates the payment across payerId's outstanding obligations
- * to receiverId using FIFO (oldest expense first).
+ * Records an actual payment from payerId -> receiverId.
+ * This only reduces obligations from this payer to this receiver.
+ * No third-party simplification is ever involved.
+ * FIFO by oldest unpaid obligation.
  */
 export async function createSettlement(input: {
   suiteId: string;
@@ -21,41 +23,44 @@ export async function createSettlement(input: {
   date: Date;
   note?: string;
 }) {
-  // All expenses where receiverId is the payer, sorted oldest first (FIFO)
   const expenses = (await Expense.find({
     suiteId: input.suiteId,
     paidBy: input.receiverId,
   })
-    .sort({ date: 1 })
+    .sort({ date: 1, _id: 1 })
     .lean()) as any[];
 
-  // Existing allocations from payerId → receiverId (to compute already-covered amounts)
-  const priorSettlements = (await Settlement.find({
+  // Count prior payment allocations already applied for this exact debtor -> creditor pair.
+  const allSettlements = (await Settlement.find({
     suiteId: input.suiteId,
-    payerId: input.payerId,
-    receiverId: input.receiverId,
+    type: "payment",
   }).lean()) as any[];
 
-  const priorAllocated = new Map<string, number>(); // expenseId → amount already covered
-  for (const s of priorSettlements) {
+  const priorAllocated = new Map<string, number>(); // expenseId -> amount already covered
+  for (const s of allSettlements) {
     for (const a of s.allocations ?? []) {
-      const key = String(a.expenseId);
-      priorAllocated.set(key, (priorAllocated.get(key) ?? 0) + a.amount);
+      if (
+        String(a.debtorId) === input.payerId &&
+        String(a.creditorId) === input.receiverId
+      ) {
+        const expenseId = String(a.expenseId);
+        priorAllocated.set(expenseId, (priorAllocated.get(expenseId) ?? 0) + a.amount);
+      }
     }
   }
 
-  // Build obligation list: how much payerId still owes receiverId per expense
+  // Build open obligations only for payerId -> receiverId
   const obligations: { expenseId: string; remaining: number }[] = [];
+
   for (const expense of expenses) {
-    // Determine payerId's share in this expense
     let owedAmount = 0;
+
     if (expense.splits?.length > 0) {
       const split = expense.splits.find(
         (s: any) => String(s.participantId) === input.payerId
       );
       owedAmount = split?.owedAmount ?? 0;
     } else {
-      // Legacy: equal split
       const isParticipant = (expense.participants ?? []).some(
         (p: any) => String(p) === input.payerId
       );
@@ -67,38 +72,69 @@ export async function createSettlement(input: {
     if (owedAmount <= 0.005) continue;
 
     const covered = priorAllocated.get(String(expense._id)) ?? 0;
-    const remaining = owedAmount - covered;
+    const remaining = Number((owedAmount - covered).toFixed(2));
     if (remaining > 0.005) {
-      obligations.push({ expenseId: String(expense._id), remaining });
+      obligations.push({
+        expenseId: String(expense._id),
+        remaining,
+      });
     }
   }
 
-  // FIFO allocation
+  const totalOpen = Number(
+    obligations.reduce((sum, o) => sum + o.remaining, 0).toFixed(2)
+  );
+
+  if (input.amount > totalOpen + 0.005) {
+    throw new Error(
+      `Payment of $${input.amount.toFixed(
+        2
+      )} exceeds open obligations of $${totalOpen.toFixed(
+        2
+      )} from this payer to this receiver`
+    );
+  }
+
   const allocations: AllocationEntry[] = [];
-  let remainingPayment = input.amount;
+  let remainingPayment = Number(input.amount.toFixed(2));
 
   for (const obligation of obligations) {
     if (remainingPayment <= 0.005) break;
-    const allocated = Math.min(remainingPayment, obligation.remaining);
+
+    const allocated = Number(
+      Math.min(remainingPayment, obligation.remaining).toFixed(2)
+    );
+
     allocations.push({
       expenseId: obligation.expenseId,
       debtorId: input.payerId,
       creditorId: input.receiverId,
-      amount: Number(allocated.toFixed(2)),
+      amount: allocated,
     });
+
     remainingPayment = Number((remainingPayment - allocated).toFixed(2));
   }
 
-  const settlement = await Settlement.create({
+  return Settlement.create({
     suiteId: input.suiteId,
     payerId: input.payerId,
     receiverId: input.receiverId,
-    amount: input.amount,
+    amount: Number(input.amount.toFixed(2)),
     date: input.date,
     note: input.note ?? "",
     status: "confirmed",
+    type: "payment",
     allocations,
   });
+}
 
-  return settlement;
+/**
+ * Legacy compatibility hook.
+ * We keep this function because callers invoke it after expense/settlement updates.
+ * The desired behavior is direct payer -> payee debt only, so netting records are removed.
+ */
+export async function recomputeNetting(suiteId: string) {
+  // Keep debt and balances strictly tied to direct payer -> payee records.
+  // Existing netting docs are cleaned up, and no new netting records are generated.
+  await Settlement.deleteMany({ suiteId, type: "netting" });
 }
