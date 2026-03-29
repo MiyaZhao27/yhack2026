@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import { useSession } from "next-auth/react";
 
 import { Home, LogIn, Receipt, ShoppingBasket, Sparkles, Wrench } from "lucide-react";
 import Link from "next/link";
@@ -19,7 +20,9 @@ const navItems = [
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { suite, members } = useSuite();
+  const { data: session, status } = useSession();
   const pathname = usePathname();
+  const showSuiteDetails = status === "authenticated" && !!session?.user;
 
   return (
     <div className="app-shell">
@@ -28,20 +31,24 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <div>
             <div className="pill bg-sky-100 text-sky-700">LiveWell</div>
             <h1 className="mt-3 text-3xl font-semibold text-slate-900">
-              {suite?.name || "Shared living, handled."}
+              {showSuiteDetails ? suite?.name || "Shared living, handled." : "Shared living, handled."}
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600">
-              Manage chores, shopping, and shared spending in one calm, demo-ready space.
+              {showSuiteDetails
+                ? "Manage chores, shopping, and shared spending in one calm, demo-ready space."
+                : "Sign in to view your suite, suitemates, chores, and shared planning tools."}
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {members.slice(0, 4).map((member) => (
-              <div key={member._id} className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Suitemate</p>
-                <p className="mt-1 text-sm font-semibold">{member.name}</p>
-              </div>
-            ))}
-          </div>
+          {showSuiteDetails ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {members.slice(0, 4).map((member) => (
+                <div key={member._id} className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Suitemate</p>
+                  <p className="mt-1 text-sm font-semibold">{member.name}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       </header>
 

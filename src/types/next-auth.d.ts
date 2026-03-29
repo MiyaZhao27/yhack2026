@@ -20,5 +20,6 @@ declare module "next-auth/jwt" {
     suiteId?: string | null;
     onboardingComplete?: boolean;
     googleId?: string;
+    googleAccessToken?: string;
   }
 }

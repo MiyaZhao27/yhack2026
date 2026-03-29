@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
+import { Types } from "mongoose";
 
 import { authOptions } from "../../../../auth";
 import { connectDatabase } from "../../../../server/config/db";
@@ -48,21 +49,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Suite code not found" }, { status: 404 });
     }
 
+    const previousSuiteId = currentUser.suiteId ? String(currentUser.suiteId) : null;
+    const nextSuiteId = String(suite._id);
+
+    if (
+      previousSuiteId &&
+      previousSuiteId !== nextSuiteId &&
+      Types.ObjectId.isValid(previousSuiteId)
+    ) {
+      await Suite.findByIdAndUpdate(previousSuiteId, {
+        $pull: { memberIds: currentUser._id },
+      });
+    }
+
     currentUser.suiteId = suite._id;
     currentUser.onboardingComplete = true;
     await currentUser.save();
 
-    suite.memberIds = Array.from(
-      new Set([...(suite.memberIds || []).map((memberId: unknown) => String(memberId)), String(currentUser._id)])
-    );
-    await suite.save();
+    await Suite.findByIdAndUpdate(suite._id, {
+      $addToSet: { memberIds: currentUser._id },
+    });
 
+    const refreshedSuite = await Suite.findById(suite._id).lean();
     const members = await User.find({ suiteId: suite._id }).lean();
     return NextResponse.json({
-      ...suite.toObject(),
+      ...(refreshedSuite as any),
       _id: String(suite._id),
-      memberIds: (suite.memberIds || []).map((memberId: any) => String(memberId)),
-      inviteCode: suite.inviteCode,
+      memberIds: (((refreshedSuite as any)?.memberIds || []) as any[]).map((memberId: any) =>
+        String(memberId)
+      ),
+      inviteCode: (refreshedSuite as any)?.inviteCode,
       members: members.map((member: any) => ({
         ...member,
         _id: String(member._id),
@@ -71,6 +87,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("join suite failed", error);
-    return NextResponse.json({ message: "Failed to join suite" }, { status: 500 });
+    return NextResponse.json(
+      { message: error instanceof Error ? error.message : "Failed to join suite" },
+      { status: 500 }
+    );
   }
 }

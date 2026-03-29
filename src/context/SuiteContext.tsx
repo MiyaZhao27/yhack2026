@@ -75,9 +75,7 @@ export function SuiteProvider({ children }: { children: ReactNode }) {
   const joinSuite = async (inviteCode: string) => {
     const joinedSuite = await api.post<Suite>("/suites/join", { inviteCode });
     localStorage.setItem(STORAGE_KEY, joinedSuite._id);
-    setSuite(joinedSuite);
-    setMembers(joinedSuite.members || []);
-    setLoading(false);
+    await refreshSuite(joinedSuite._id);
     return joinedSuite;
   };
 
