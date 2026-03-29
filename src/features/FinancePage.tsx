@@ -19,7 +19,7 @@ type SettleUp = { from: string; fromId?: string; to: string; toId?: string; amou
 type ExpenseMode = "manual" | "receipt";
 
 export function FinancePage() {
-  const { suite, members } = useSuite();
+  const { suite, members, refreshSuite } = useSuite();
   const { data: session, status } = useSession();
   const currentUserId = session?.user?.id ?? "";
 
@@ -35,6 +35,7 @@ export function FinancePage() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [historyView, setHistoryView] = useState<"expenses" | "settlements">("expenses");
   const [expandedExpenses, setExpandedExpenses] = useState<Record<string, boolean>>({});
+  const [venmoDrafts, setVenmoDrafts] = useState<Record<string, string>>({});
 
   const loadAll = async () => {
     if (!suite?._id || status !== "authenticated") return;
@@ -59,6 +60,12 @@ export function FinancePage() {
     }
     void loadAll();
   }, [suite?._id, status]);
+
+  useEffect(() => {
+    setVenmoDrafts(
+      Object.fromEntries(members.map((member) => [member._id, member.venmoUsername || ""]))
+    );
+  }, [members]);
 
   const nameFor = (id: string) => members.find((member) => member._id === id)?.name ?? "Unknown";
 
@@ -107,6 +114,28 @@ export function FinancePage() {
     exact: "Exact amounts",
     percentage: "Percentage split",
     itemized: "Itemized split",
+  };
+
+  const venmoLinkFor = (username: string, amount: number, note: string) => {
+    const cleanUsername = username.replace(/^@/, "");
+    const params = new URLSearchParams({
+      txn: "pay",
+      recipients: cleanUsername,
+      amount: amount.toFixed(2),
+      note,
+    });
+
+    return `https://account.venmo.com/pay?${params.toString()}`;
+  };
+
+  const saveVenmoUsername = async (userId: string) => {
+    if (!suite?._id) return;
+    await api.patch("/users", {
+      userId,
+      suiteId: suite._id,
+      venmoUsername: venmoDrafts[userId] || "",
+    });
+    await refreshSuite(suite._id);
   };
 
   return (
@@ -200,14 +229,47 @@ export function FinancePage() {
                   <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#8f1d3a]">You Owe</p>
                   <div className="space-y-1.5">
                     {iOwe.map((item, index) => (
-                      <button
+                      <div
                         key={`${item.fromId}-${item.toId}-${index}`}
-                        className="flex w-full items-center justify-between rounded-xl bg-[#ffe0ea] px-3 py-2 text-left text-sm text-[#8f1d3a]"
-                        onClick={() => openPayment({ payerId: item.fromId, receiverId: item.toId, amount: item.amount })}
+                        className="rounded-xl bg-[#ffe0ea] px-3 py-2 text-sm text-[#8f1d3a]"
                       >
-                        <span>Pay {item.to}</span>
-                        <span className="font-semibold">{formatCurrency(item.amount)}</span>
-                      </button>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>Pay {item.to}</span>
+                          <span className="font-semibold">{formatCurrency(item.amount)}</span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            className="button-secondary px-3 py-1.5 text-xs"
+                            onClick={() =>
+                              openPayment({ payerId: item.fromId, receiverId: item.toId, amount: item.amount })
+                            }
+                            type="button"
+                          >
+                            Record Payment
+                          </button>
+                          {(() => {
+                            const recipient = members.find((member) => member._id === item.toId);
+                            return recipient?.venmoUsername ? (
+                              <a
+                                className="button-primary px-3 py-1.5 text-xs"
+                                href={venmoLinkFor(
+                                  recipient.venmoUsername,
+                                  item.amount,
+                                  `${suite?.name || "Suite"} settle up`
+                                )}
+                                rel="noreferrer"
+                                target="_blank"
+                              >
+                                Pay on Venmo
+                              </a>
+                            ) : (
+                              <span className="px-1 py-1 text-xs text-[#8f1d3a]/70">
+                                Add their Venmo username below to enable quick pay.
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      </div>
                     ))}
                     {!iOwe.length ? <p className="text-sm text-muted">Nothing to pay.</p> : null}
                   </div>
@@ -228,6 +290,45 @@ export function FinancePage() {
                     {!owedToMe.length ? <p className="text-sm text-muted">No incoming payments.</p> : null}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="surface-soft rounded-2xl px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Venmo Usernames</p>
+              <div className="mt-3 space-y-2">
+                {members.map((member) => (
+                  <div key={member._id} className="rounded-xl bg-white/80 px-3 py-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-[#2a1738]">{member.name}</p>
+                        <p className="text-xs text-muted">
+                          {member._id === currentUserId ? "Your Venmo handle" : "Used for one-tap settle up links"}
+                        </p>
+                      </div>
+                      <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[260px] sm:flex-row">
+                        <input
+                          className="input"
+                          placeholder="@username"
+                          value={venmoDrafts[member._id] || ""}
+                          onChange={(event) =>
+                            setVenmoDrafts((current) => ({
+                              ...current,
+                              [member._id]: event.target.value.replace(/\s+/g, ""),
+                            }))
+                          }
+                        />
+                        <button
+                          className="button-secondary whitespace-nowrap px-3"
+                          onClick={() => void saveVenmoUsername(member._id)}
+                          type="button"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {!members.length ? <EmptyState label="No suite members yet." /> : null}
               </div>
             </div>
           </div>

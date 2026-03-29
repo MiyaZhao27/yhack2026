@@ -5,6 +5,7 @@ export interface Member {
   suiteIds?: string[];
   activeSuiteId?: string | null;
   email?: string;
+  venmoUsername?: string | null;
 }
 
 export interface Suite {

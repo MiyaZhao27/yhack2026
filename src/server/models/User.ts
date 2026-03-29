@@ -4,6 +4,7 @@ export interface UserDocument {
   name: string;
   email?: string;
   image?: string | null;
+  venmoUsername?: string | null;
   googleId?: string;
   googleAccessToken?: string | null;
   googleRefreshToken?: string | null;
@@ -20,6 +21,7 @@ const userSchema = new Schema<UserDocument>(
     name: { type: String, required: true, trim: true },
     email: { type: String, unique: true, sparse: true, trim: true, lowercase: true },
     image: { type: String, default: null },
+    venmoUsername: { type: String, default: null, trim: true },
     googleId: { type: String, unique: true, sparse: true },
     googleAccessToken: { type: String, default: null },
     googleRefreshToken: { type: String, default: null },
