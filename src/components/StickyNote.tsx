@@ -57,7 +57,7 @@ export function StickyNote({
 
   return (
     <div
-      className={`absolute rounded-[22px] border border-white/60 shadow-[0_18px_30px_rgba(15,23,42,0.16)] ${colorClasses[note.color]} ${
+      className={`absolute rounded-none border border-white/60 shadow-[0_18px_30px_rgba(15,23,42,0.16)] ${colorClasses[note.color]} ${
         isDragging ? "z-30 cursor-grabbing transition-none" : "z-10 cursor-grab transition-[left,top,transform,box-shadow] duration-200"
       }`}
       style={{
