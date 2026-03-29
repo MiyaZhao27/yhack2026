@@ -41,7 +41,7 @@ export function DashboardPage() {
         </div>
 
         <div className="relative z-0">
-          <SectionCard title="Today + Overdue" subtitle="The highest-priority chores across the suite">
+          <SectionCard title="My Tasks">
             <div className="space-y-3">
               {[...(data?.dueToday || []), ...(data?.overdue || [])].slice(0, 6).map((task) => (
                 <div key={task._id} className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">

@@ -18,6 +18,8 @@ interface TasksPageProps {
   };
 }
 
+type TaskBoardFilter = "all" | "outstanding" | "me" | "done";
+
 function startOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
@@ -103,7 +105,9 @@ export function TasksPage({ currentUser }: TasksPageProps) {
   const [googleTasks, setGoogleTasks] = useState<GoogleTaskItem[]>([]);
   const [googleTasksError, setGoogleTasksError] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
-  const [statusFilter, setStatusFilter] = useState<"all" | Task["status"]>("all");
+  const [statusFilter, setStatusFilter] = useState<TaskBoardFilter>("all");
+  const [reassigningTaskId, setReassigningTaskId] = useState<string | null>(null);
+  const [reassignAssigneeId, setReassignAssigneeId] = useState("");
   const [form, setForm] = useState({
     title: "",
     notes: "",
@@ -182,6 +186,19 @@ export function TasksPage({ currentUser }: TasksPageProps) {
     await loadTasks();
   };
 
+  const reassignTask = async (task: Task, assigneeId: string) => {
+    if (!assigneeId || assigneeId === task.assigneeId) {
+      setReassigningTaskId(null);
+      setReassignAssigneeId("");
+      return;
+    }
+
+    await api.patch(`/tasks/${task._id}`, { ...task, assigneeId });
+    setReassigningTaskId(null);
+    setReassignAssigneeId("");
+    await loadTasks();
+  };
+
   const addTaskToGoogleTasks = async (task: Task) => {
     await api.post(`/tasks/${task._id}`, {});
     await loadTasks();
@@ -192,8 +209,18 @@ export function TasksPage({ currentUser }: TasksPageProps) {
   const today = new Date();
   const gridStart = startOfCalendarGrid(calendarMonth);
   const calendarDays = Array.from({ length: 35 }, (_, index) => addDays(gridStart, index));
-  const visibleTasks =
-    statusFilter === "all" ? tasks : tasks.filter((task) => task.status === statusFilter);
+  const visibleTasks = tasks.filter((task) => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "done") return task.status === "done";
+    if (statusFilter === "outstanding") return task.status === "pending" || task.status === "overdue";
+    if (statusFilter === "me") {
+      return (
+        task.assigneeId === currentUser?.id &&
+        (task.status === "pending" || task.status === "overdue")
+      );
+    }
+    return true;
+  });
   const calendarItems = [...googleTasks, ...addRecurringTaskInstances(tasks, gridStart, calendarDays)].filter(
     (task, index, all) =>
       all.findIndex(
@@ -344,13 +371,13 @@ export function TasksPage({ currentUser }: TasksPageProps) {
         </form>
       </SectionCard>
 
-      <SectionCard title="Task Board" subtitle="Pending, done, and overdue in one place">
+      <SectionCard title="Task Board" subtitle="Outstanding, done, and your current tasks in one place">
         <div className="mb-4 flex flex-wrap gap-2">
           {[
             { label: "All", value: "all" as const },
-            { label: "Pending", value: "pending" as const },
-            { label: "Overdue", value: "overdue" as const },
+            { label: "Outstanding", value: "outstanding" as const },
             { label: "Done", value: "done" as const },
+            { label: "Me", value: "me" as const },
           ].map((option) => (
             <button
               key={option.value}
@@ -362,7 +389,7 @@ export function TasksPage({ currentUser }: TasksPageProps) {
             </button>
           ))}
         </div>
-        <div className="space-y-3">
+        <div className="max-h-[34rem] space-y-3 overflow-y-auto pr-1">
           {visibleTasks.map((task) => (
             <div key={task._id} className="rounded-2xl bg-slate-50 p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -373,19 +400,63 @@ export function TasksPage({ currentUser }: TasksPageProps) {
                   </p>
                   {task.notes ? <p className="mt-1 text-sm text-slate-500">{task.notes}</p> : null}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {currentUser?.id === task.assigneeId && !task.googleTaskId ? (
                     <button className="button-secondary" onClick={() => addTaskToGoogleTasks(task)}>
                       Add to Google Tasks
                     </button>
                   ) : null}
+                  <button
+                    className="button-secondary"
+                    type="button"
+                    onClick={() => {
+                      setReassigningTaskId((current) => (current === task._id ? null : task._id));
+                      setReassignAssigneeId(task.assigneeId);
+                    }}
+                  >
+                    Reassign
+                  </button>
                   {task.status !== "done" ? (
-                    <button className="button-secondary" onClick={() => updateStatus(task, "done")}>
+                    <button className="button-secondary" type="button" onClick={() => updateStatus(task, "done")}>
                       Done
                     </button>
                   ) : null}
                 </div>
               </div>
+              {reassigningTaskId === task._id ? (
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <select
+                    className="input sm:max-w-56"
+                    value={reassignAssigneeId}
+                    onChange={(event) => setReassignAssigneeId(event.target.value)}
+                  >
+                    {members.map((member) => (
+                      <option key={member._id} value={member._id}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      className="button-secondary"
+                      type="button"
+                      onClick={() => void reassignTask(task, reassignAssigneeId)}
+                    >
+                      Save
+                    </button>
+                    <button
+                      className="button-secondary"
+                      type="button"
+                      onClick={() => {
+                        setReassigningTaskId(null);
+                        setReassignAssigneeId("");
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <div className="mt-3">
                 <span
                   className={`pill ${

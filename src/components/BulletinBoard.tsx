@@ -256,7 +256,6 @@ export function BulletinBoard() {
   return (
     <SectionCard
       title="Bulletin Board"
-      subtitle="Leave quick shared notes without cluttering the rest of the dashboard."
       action={
         <div className="relative">
           <button
