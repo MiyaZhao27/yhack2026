@@ -9,6 +9,8 @@ interface AIReceiptResult {
   items: ReceiptLineItem[];
 }
 
+const shouldDebugReceiptAI = process.env.RECEIPT_AI_DEBUG === "1";
+
 export async function parseReceiptWithLava(
   imageBase64: string,
   mimeType: string
@@ -42,12 +44,12 @@ Fields to extract:
 - "purchaseDate": the purchase date in YYYY-MM-DD format (string or null)
 - "total": the final grand total dollar amount charged (number or null)
 - "subtotal": the subtotal before tax/fees (number or null)
-- "fees": the SUM of ALL of the following found on the receipt: sales tax, tax, HST, GST, VAT, tip, gratuity, service fee, service charge, surcharge, delivery fee. If a line shows a percentage rate like "7.5%" or "7.5000 %" followed by a dollar amount, that dollar amount is a tax — include it. Sum everything into one number.
-- "items": array of individual purchased products AND discounts. Rules:
-  - Each item: "name" = the actual product/dish name text on the receipt (NOT the price), "amount" = the final line total for that item (quantity × unit price). If a receipt line shows "2 x $5.00" the amount is 10.00.
-  - Discounts, coupons, vouchers, savings, and promo codes are included as items with a NEGATIVE amount (e.g. a $2.00 coupon becomes {"name":"Coupon","amount":-2.00}).
-  - Do NOT include subtotal, total, balance due, change, tax, tip, or payment method lines in "items".
-  - Do NOT use prices as item names — use the descriptive product/discount text.
+- "fees": the SUM of ALL add-on charges that are NOT the core purchased product. This includes: sales tax, tax, HST, GST, VAT, tip, gratuity, service fee, service charge, booking fee, surcharge (any kind), delivery fee, congestion charge, accessibility charge, administrative charge, and any government-mandated fees. If a line shows a percentage rate like "7.5%" followed by a dollar amount, include that dollar amount. Sum ALL such lines into one number.
+- "items": array of the core purchased products/services AND discounts ONLY. Rules:
+  - Each item: "name" = the actual product/dish/service name (NOT the price), "amount" = the final line total (quantity × unit price).
+  - Discounts, coupons, vouchers, savings, and promo codes are items with a NEGATIVE amount (e.g. {"name":"Coupon","amount":-2.00}).
+  - IMPORTANT: Do NOT put anything in both "items" AND "fees". Every line belongs to exactly one bucket.
+  - Do NOT include in "items": subtotal, total, balance due, change, tax, tip, any surcharge, any fee, or payment method lines.
 
 Respond with this exact JSON structure:
 {"merchantName":null,"purchaseDate":null,"total":null,"subtotal":null,"fees":0,"items":[{"name":"product name","amount":0.00},{"name":"Coupon","amount":-2.00}]}`,
@@ -67,12 +69,16 @@ Respond with this exact JSON structure:
   const data = (await response.json()) as {
     choices?: { message?: { content?: string; reasoning_content?: string } }[];
   };
-  console.log("[Lava] full data:", JSON.stringify(data, null, 2));
+  if (shouldDebugReceiptAI) {
+    console.log("[Lava] full data:", JSON.stringify(data, null, 2));
+  }
   const text =
     data.choices?.[0]?.message?.content ||
     data.choices?.[0]?.message?.reasoning_content ||
     "";
-  console.log("[Lava] raw response:", text);
+  if (shouldDebugReceiptAI) {
+    console.log("[Lava] raw response:", text);
+  }
 
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
@@ -81,7 +87,9 @@ Respond with this exact JSON structure:
   }
 
   const parsed = JSON.parse(jsonMatch[0]) as Partial<AIReceiptResult>;
-  console.log("[Lava] parsed:", JSON.stringify(parsed, null, 2));
+  if (shouldDebugReceiptAI) {
+    console.log("[Lava] parsed:", JSON.stringify(parsed, null, 2));
+  }
 
   const items: ReceiptLineItem[] = (parsed.items ?? [])
     .filter((item) => item.name && typeof item.amount === "number" && item.amount !== 0)

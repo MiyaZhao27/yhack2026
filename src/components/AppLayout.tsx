@@ -8,6 +8,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useSuite } from "../context/SuiteContext";
+import { SuiteAgent } from "./SuiteAgent";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: Home },
@@ -74,6 +75,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </nav>
 
       {children}
+      {showSuiteDetails && <SuiteAgent />}
     </div>
   );
 }
