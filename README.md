@@ -1,5 +1,7 @@
 # SuiteEase
 
+Check it out: https://yhack2026-nu.vercel.app/
+
 SuiteEase is a full-stack shared-living web app for roommates and suitemates. It combines chores, a shared bulletin board, expense tracking, settle-up flows, Google sign-in, and multi-suite membership in a single Next.js app backed by MongoDB.
 
 This repository is the active app. It uses:
